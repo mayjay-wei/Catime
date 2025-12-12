@@ -11,17 +11,6 @@
 #include <windows.h>
 
 /**
- * @brief Load Pomodoro configuration from INI file
- * 
- * @details
- * Loads POMODORO_TIME_OPTIONS and POMODORO_LOOP_COUNT from config.
- * Updates global POMODORO_TIMES array and related variables.
- * 
- * @note Should be called before building Pomodoro menu
- */
-void LoadPomodoroConfig(void);
-
-/**
  * @brief Build Pomodoro submenu
  * @param hMenu Parent menu handle to append Pomodoro submenu to
  * 
