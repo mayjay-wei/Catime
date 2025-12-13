@@ -234,25 +234,20 @@ static BOOL HandleForceRedraw(HWND hwnd) {
 /** Faster updates in last 2 seconds for smoother UX */
 static void AdjustTimerIntervalForTail(HWND hwnd) {
     if (g_AppConfig.display.time_format.show_milliseconds || CLOCK_COUNT_UP || CLOCK_SHOW_CURRENT_TIME || CLOCK_TOTAL_TIME == 0) {
-        if (tail_fast_mode_active) {
-            SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
-            tail_fast_mode_active = FALSE;
-        }
+        if (!tail_fast_mode_active) return;
+        SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
+        tail_fast_mode_active = FALSE;
         return;
     }
     
     int remaining = CLOCK_TOTAL_TIME - countdown_elapsed_time;
     
-    if (remaining <= TAIL_SEGMENT_THRESHOLD_SECONDS && remaining > 0) {
-        if (!tail_fast_mode_active) {
-            SetTimer(hwnd, TIMER_ID_MAIN, TAIL_FAST_INTERVAL_MS, NULL);
-            tail_fast_mode_active = TRUE;
-                }
-            } else {
-        if (tail_fast_mode_active) {
-            SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
-            tail_fast_mode_active = FALSE;
-        }
+    if (remaining <= TAIL_SEGMENT_THRESHOLD_SECONDS && remaining > 0 && !tail_fast_mode_active) {
+        SetTimer(hwnd, TIMER_ID_MAIN, TAIL_FAST_INTERVAL_MS, NULL);
+        tail_fast_mode_active = TRUE;
+    } else if (tail_fast_mode_active) {
+        SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
+        tail_fast_mode_active = FALSE;
     }
 }
 
@@ -549,47 +544,42 @@ static BOOL HandleMainTimer(HWND hwnd) {
     
     AdjustTimerIntervalForTail(hwnd);
     
-    if (ms_accumulator >= 1000) {
-        int seconds_to_add = ms_accumulator / 1000;
+    if (ms_accumulator < 1000) return TRUE;
+    
+    const int seconds_to_add = 1;
+    // TODO: Why does the millisecond count up when the mode is count down?
+    if (g_AppConfig.display.time_format.show_milliseconds) {
         ms_accumulator %= 1000;
-        
-        if (!g_AppConfig.display.time_format.show_milliseconds && seconds_to_add > 1) {
-            seconds_to_add = 1;
-        }
-        
-        if (CLOCK_COUNT_UP) {
-            countup_elapsed_time += seconds_to_add;
+    }
+
+    if (CLOCK_COUNT_UP) {
+        countup_elapsed_time += seconds_to_add;
+    } else if (countdown_elapsed_time < CLOCK_TOTAL_TIME) {
+        countdown_elapsed_time += seconds_to_add;
+    } else {
+        if (!countdown_message_shown) {
+            countdown_message_shown = TRUE;
+            
+            TrayAnimation_RecomputeTimerDelay();
+            
+            ReadNotificationMessagesConfig();
+            ReadNotificationTypeConfig();
+            
+            BOOL pomodoro_advanced = FALSE;
+            if (IsActivePomodoroTimer()) {
+                pomodoro_advanced = HandlePomodoroCompletion(hwnd);
             } else {
-            if (countdown_elapsed_time < CLOCK_TOTAL_TIME) {
-                countdown_elapsed_time += seconds_to_add;
+                HandleCountdownCompletion(hwnd);
             }
             
-            if (countdown_elapsed_time >= CLOCK_TOTAL_TIME) {
-                if (!countdown_message_shown) {
-                    countdown_message_shown = TRUE;
-                    
-                    TrayAnimation_RecomputeTimerDelay();
-                    
-                    ReadNotificationMessagesConfig();
-                    ReadNotificationTypeConfig();
-                    
-                    BOOL pomodoro_advanced = FALSE;
-                    if (IsActivePomodoroTimer()) {
-                        pomodoro_advanced = HandlePomodoroCompletion(hwnd);
-                    } else {
-                        HandleCountdownCompletion(hwnd);
-                    }
-                    
-                    if (pomodoro_advanced) {
-                        return TRUE;
-                    }
-                }
-                countdown_elapsed_time = CLOCK_TOTAL_TIME;
+            if (pomodoro_advanced) {
+                return TRUE;
             }
         }
-        
-        InvalidateRect(hwnd, NULL, TRUE);
+        countdown_elapsed_time = CLOCK_TOTAL_TIME;
     }
+        
+    InvalidateRect(hwnd, NULL, TRUE);
     
     return TRUE;
 }
