@@ -23,18 +23,11 @@
 #include "log.h"
 #include "window/window_desktop_integration.h"
 
-/* Pomodoro and timer constants:
- * - 1500s = 25 min (standard Pomodoro work duration)
- * - 1500ms retry: Balance between responsiveness and avoiding spam on persistent failures
- * - 2000ms font check: Periodic validation without excessive overhead
- * - 250ms tail mode: Fast updates for final 2 seconds of countdown (visual precision)
- */
+/* Pomodoro and timer constants */
 #define DEFAULT_POMODORO_DURATION 1500
 #define MAX_RETRY_ATTEMPTS 3
 #define RETRY_INTERVAL_MS 1500
 #define FONT_CHECK_INTERVAL_MS 2000
-#define TAIL_SEGMENT_THRESHOLD_SECONDS 2
-#define TAIL_FAST_INTERVAL_MS 250
 #define MAX_POMODORO_TIMES 10
 #define MESSAGE_BUFFER_SIZE 256
 
@@ -43,9 +36,9 @@ POMODORO_PHASE current_pomodoro_phase = POMODORO_PHASE_IDLE;
 int complete_pomodoro_cycles = 0;
 static int pomodoro_initial_times_count = 0;
 static int pomodoro_initial_loop_count = 0;
+static int pomodoro_initial_times[MAX_POMODORO_TIMES] = {0};
 static DWORD last_timer_tick = 0;
 static int ms_accumulator = 0;
-static BOOL tail_fast_mode_active = FALSE;
 static BOOL topmost_fast_mode_active = FALSE;
 
 static inline void ForceWindowRedraw(HWND hwnd) {
@@ -74,7 +67,6 @@ static void ShowTimeoutNotification(HWND hwnd, const char* messageUtf8, BOOL pla
     }
     
     if (playSound && CLOCK_TIMEOUT_ACTION == TIMEOUT_ACTION_MESSAGE) {
-        ReadNotificationSoundConfig();
         PlayNotificationSound(hwnd);
     }
 }
@@ -164,17 +156,17 @@ static void SetupVisibilityWindow(HWND hwnd) {
 }
 
 static BOOL AdvancePomodoroState(void) {
-    if (g_AppConfig.pomodoro.times_count == 0) {
+    if (pomodoro_initial_times_count == 0) {
         return FALSE;
     }
     
     current_pomodoro_time_index++;
     
-    if (current_pomodoro_time_index >= g_AppConfig.pomodoro.times_count) {
+    if (current_pomodoro_time_index >= pomodoro_initial_times_count) {
         current_pomodoro_time_index = 0;
         complete_pomodoro_cycles++;
         
-        if (complete_pomodoro_cycles >= g_AppConfig.pomodoro.loop_count) {
+        if (complete_pomodoro_cycles >= pomodoro_initial_loop_count) {
             return FALSE;
         }
     }
@@ -182,12 +174,13 @@ static BOOL AdvancePomodoroState(void) {
     return TRUE;
 }
 
-static void ResetPomodoroState(void) {
+void ResetPomodoroState(void) {
     current_pomodoro_phase = POMODORO_PHASE_IDLE;
     current_pomodoro_time_index = 0;
     complete_pomodoro_cycles = 0;
     pomodoro_initial_times_count = 0;
     pomodoro_initial_loop_count = 0;
+    memset(pomodoro_initial_times, 0, sizeof(pomodoro_initial_times));
 }
 
 static BOOL IsActivePomodoroTimer(void) {
@@ -195,15 +188,15 @@ static BOOL IsActivePomodoroTimer(void) {
         return FALSE;
     }
     
-    if (g_AppConfig.pomodoro.times_count == 0) {
+    if (pomodoro_initial_times_count == 0) {
         return FALSE;
     }
     
-    if (current_pomodoro_time_index >= g_AppConfig.pomodoro.times_count) {
+    if (current_pomodoro_time_index >= pomodoro_initial_times_count) {
         return FALSE;
     }
     
-    if (CLOCK_TOTAL_TIME != g_AppConfig.pomodoro.times[current_pomodoro_time_index]) {
+    if (CLOCK_TOTAL_TIME != pomodoro_initial_times[current_pomodoro_time_index]) {
         return FALSE;
     }
     
@@ -252,65 +245,63 @@ static void AdjustTimerIntervalForTail(HWND hwnd) {
 }
 
 static void HandleTimeoutActions(HWND hwnd) {
-                        switch (CLOCK_TIMEOUT_ACTION) {
-                            case TIMEOUT_ACTION_MESSAGE:
-                                break;
-            
-                            case TIMEOUT_ACTION_LOCK:
-                                LockWorkStation();
-                                break;
-            
+    switch (CLOCK_TIMEOUT_ACTION) {
+        case TIMEOUT_ACTION_MESSAGE:
+            break;
+
+        case TIMEOUT_ACTION_LOCK:
+            LockWorkStation();
+            break;
+
         case TIMEOUT_ACTION_OPEN_FILE:
-                                if (strlen(CLOCK_TIMEOUT_FILE_PATH) > 0) {
-                                    wchar_t wPath[MAX_PATH];
-                                    MultiByteToWideChar(CP_UTF8, 0, CLOCK_TIMEOUT_FILE_PATH, -1, wPath, MAX_PATH);
-                                    
-                                    HINSTANCE result = ShellExecuteW(NULL, L"open", wPath, NULL, NULL, SW_SHOWNORMAL);
-                                    if ((INT_PTR)result <= 32) {
-                                        LOG_WARNING("Failed to open timeout file: %s (ShellExecute error code: %d)", 
-                                                   CLOCK_TIMEOUT_FILE_PATH, (int)(INT_PTR)result);
-                                    }
-                                }
-                                break;
-            
-                            case TIMEOUT_ACTION_SHOW_TIME:
-                                StopNotificationSound();
-                                CLOCK_SHOW_CURRENT_TIME = TRUE;
-                                CLOCK_COUNT_UP = FALSE;
-                                ResetMillisecondAccumulator();
-        KillTimer(hwnd, TIMER_ID_MAIN);
-        SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
-                                InvalidateRect(hwnd, NULL, TRUE);
-                                break;
-            
-                            case TIMEOUT_ACTION_COUNT_UP:
-                                StopNotificationSound();
-                                CLOCK_COUNT_UP = TRUE;
-                                CLOCK_SHOW_CURRENT_TIME = FALSE;
-                                countup_elapsed_time = 0;
-                                elapsed_time = 0;
-                                message_shown = FALSE;
-                                countdown_message_shown = FALSE;
-                                countup_message_shown = FALSE;
-                                CLOCK_IS_PAUSED = FALSE;
-                                ResetMillisecondAccumulator();
+            if (strlen(CLOCK_TIMEOUT_FILE_PATH) > 0) {
+                wchar_t wPath[MAX_PATH];
+                MultiByteToWideChar(CP_UTF8, 0, CLOCK_TIMEOUT_FILE_PATH, -1, wPath, MAX_PATH);
+                HINSTANCE result = ShellExecuteW(NULL, L"open", wPath, NULL, NULL, SW_SHOWNORMAL);
+                if ((INT_PTR)result <= 32) {
+                    LOG_WARNING("Failed to open timeout file: %s (error: %d)", 
+                               CLOCK_TIMEOUT_FILE_PATH, (int)(INT_PTR)result);
+                }
+            }
+            break;
+
+        case TIMEOUT_ACTION_SHOW_TIME:
+            StopNotificationSound();
+            CLOCK_SHOW_CURRENT_TIME = TRUE;
+            CLOCK_COUNT_UP = FALSE;
+            ResetMillisecondAccumulator();
             KillTimer(hwnd, TIMER_ID_MAIN);
             SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
-                                InvalidateRect(hwnd, NULL, TRUE);
-                                break;
-            
-                            case TIMEOUT_ACTION_OPEN_WEBSITE:
-                                if (wcslen(CLOCK_TIMEOUT_WEBSITE_URL) > 0) {
-                                    HINSTANCE result = ShellExecuteW(NULL, L"open", CLOCK_TIMEOUT_WEBSITE_URL, NULL, NULL, SW_NORMAL);
-                                    if ((INT_PTR)result <= 32) {
-                                        char urlUtf8[MAX_PATH];
-                                        WideCharToMultiByte(CP_UTF8, 0, CLOCK_TIMEOUT_WEBSITE_URL, -1, urlUtf8, MAX_PATH, NULL, NULL);
-                                        LOG_WARNING("Failed to open timeout website: %s (ShellExecute error code: %d)", 
-                                                   urlUtf8, (int)(INT_PTR)result);
-                                    }
-                                }
-                                break;
-                        }
+            InvalidateRect(hwnd, NULL, TRUE);
+            break;
+
+        case TIMEOUT_ACTION_COUNT_UP:
+            StopNotificationSound();
+            CLOCK_COUNT_UP = TRUE;
+            CLOCK_SHOW_CURRENT_TIME = FALSE;
+            countup_elapsed_time = 0;
+            elapsed_time = 0;
+            message_shown = FALSE;
+            countdown_message_shown = FALSE;
+            CLOCK_IS_PAUSED = FALSE;
+            ResetMillisecondAccumulator();
+            KillTimer(hwnd, TIMER_ID_MAIN);
+            SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
+            InvalidateRect(hwnd, NULL, TRUE);
+            break;
+
+        case TIMEOUT_ACTION_OPEN_WEBSITE:
+            if (wcslen(CLOCK_TIMEOUT_WEBSITE_URL) > 0) {
+                HINSTANCE result = ShellExecuteW(NULL, L"open", CLOCK_TIMEOUT_WEBSITE_URL, NULL, NULL, SW_NORMAL);
+                if ((INT_PTR)result <= 32) {
+                    char urlUtf8[MAX_PATH];
+                    WideCharToMultiByte(CP_UTF8, 0, CLOCK_TIMEOUT_WEBSITE_URL, -1, urlUtf8, MAX_PATH, NULL, NULL);
+                    LOG_WARNING("Failed to open timeout website: %s (error: %d)", 
+                               urlUtf8, (int)(INT_PTR)result);
+                }
+            }
+            break;
+    }
 }
 
 static void FormatPomodoroTime(int seconds, wchar_t* buffer, size_t bufferSize) {
@@ -330,35 +321,40 @@ static void FormatPomodoroTime(int seconds, wchar_t* buffer, size_t bufferSize) 
 static BOOL HandlePomodoroCompletion(HWND hwnd) {
     wchar_t completionMsg[256];
     wchar_t timeStr[32];
-    
+
     int completedIndex = current_pomodoro_time_index;
-    
-    int times_count = (pomodoro_initial_times_count > 0) 
-        ? pomodoro_initial_times_count : g_AppConfig.pomodoro.times_count;
-    int loop_count = (pomodoro_initial_loop_count > 0) 
-        ? pomodoro_initial_loop_count : g_AppConfig.pomodoro.loop_count;
-    
+    int times_count = pomodoro_initial_times_count;
+    int loop_count = pomodoro_initial_loop_count;
+
     if (times_count <= 0) times_count = 1;
     if (loop_count <= 0) loop_count = 1;
-    
-    int currentStep = complete_pomodoro_cycles * times_count + completedIndex + 1;
-    int totalSteps = times_count * loop_count;
-    
-    if (completedIndex < g_AppConfig.pomodoro.times_count) {
-        FormatPomodoroTime(g_AppConfig.pomodoro.times[completedIndex], timeStr, sizeof(timeStr)/sizeof(wchar_t));
+
+    /* Current step within this cycle (1-based) */
+    int stepInCycle = completedIndex + 1;
+    /* Current cycle number (1-based) */
+    int currentCycle = complete_pomodoro_cycles + 1;
+
+    if (completedIndex < pomodoro_initial_times_count) {
+        FormatPomodoroTime(pomodoro_initial_times[completedIndex], timeStr, sizeof(timeStr)/sizeof(wchar_t));
     } else {
         wcscpy_s(timeStr, 32, L"?");
     }
-    
+
     if (!AdvancePomodoroState()) {
         const wchar_t* completed_text = GetLocalizedString(NULL, L"Pomodoro completed");
-        if (totalSteps > 1) {
+        const wchar_t* cycle_text = GetLocalizedString(NULL, L"Cycle");
+        const wchar_t* round_text = GetLocalizedString(NULL, L"Round");
+        if (times_count > 1 || loop_count > 1) {
             _snwprintf_s(completionMsg, sizeof(completionMsg)/sizeof(wchar_t), _TRUNCATE,
-                    L"%ls %ls (%d/%d)",
+                    L"%ls %ls (%ls%d/%d%ls %d/%d)",
                     timeStr,
                     completed_text,
-                    currentStep,
-                    totalSteps);
+                    cycle_text,
+                    currentCycle,
+                    loop_count,
+                    round_text,
+                    stepInCycle,
+                    times_count);
         } else {
             _snwprintf_s(completionMsg, sizeof(completionMsg)/sizeof(wchar_t), _TRUNCATE,
                     L"%ls %ls",
@@ -366,23 +362,14 @@ static BOOL HandlePomodoroCompletion(HWND hwnd) {
                     completed_text);
         }
         ShowNotification(hwnd, completionMsg);
-        
+
         ResetTimerState(0);
         ResetPomodoroState();
-        
+
         const wchar_t* cycle_complete_text = GetLocalizedString(NULL, L"All Pomodoro cycles completed!");
-        wchar_t finalMsg[MESSAGE_BUFFER_SIZE];
-        _snwprintf_s(finalMsg, sizeof(finalMsg)/sizeof(wchar_t), _TRUNCATE,
-                    L"%ls (%d/%d)",
-                    cycle_complete_text,
-                    totalSteps,
-                    totalSteps);
-        ShowNotification(hwnd, finalMsg);
-        if (CLOCK_TIMEOUT_ACTION == TIMEOUT_ACTION_MESSAGE) {
-            ReadNotificationSoundConfig();
-            PlayNotificationSound(hwnd);
-        }
-        
+        ShowNotification(hwnd, cycle_complete_text);
+        PlayNotificationSound(hwnd);
+
         CLOCK_COUNT_UP = FALSE;
         CLOCK_SHOW_CURRENT_TIME = FALSE;
         message_shown = TRUE;
@@ -390,15 +377,21 @@ static BOOL HandlePomodoroCompletion(HWND hwnd) {
         KillTimer(hwnd, TIMER_ID_MAIN);
         return FALSE;
     }
-    
+
     const wchar_t* completed_text = GetLocalizedString(NULL, L"Pomodoro completed");
-    if (totalSteps > 1) {
+    const wchar_t* cycle_text = GetLocalizedString(NULL, L"Cycle");
+    const wchar_t* round_text = GetLocalizedString(NULL, L"Round");
+    if (times_count > 1 || loop_count > 1) {
         _snwprintf_s(completionMsg, sizeof(completionMsg)/sizeof(wchar_t), _TRUNCATE,
-                L"%ls %ls (%d/%d)",
+                L"%ls %ls (%ls%d/%d%ls %d/%d)",
                 timeStr,
                 completed_text,
-                currentStep,
-                totalSteps);
+                cycle_text,
+                currentCycle,
+                loop_count,
+                round_text,
+                stepInCycle,
+                times_count);
     } else {
         _snwprintf_s(completionMsg, sizeof(completionMsg)/sizeof(wchar_t), _TRUNCATE,
                 L"%ls %ls",
@@ -406,18 +399,15 @@ static BOOL HandlePomodoroCompletion(HWND hwnd) {
                 completed_text);
     }
     ShowNotification(hwnd, completionMsg);
+    PlayNotificationSound(hwnd);
 
-    if (CLOCK_TIMEOUT_ACTION == TIMEOUT_ACTION_MESSAGE) {
-        ReadNotificationSoundConfig();
-        PlayNotificationSound(hwnd);
-    }
-
-    if (current_pomodoro_time_index >= g_AppConfig.pomodoro.times_count) {
-        ResetPomodoroState();
-        return FALSE;
-    }
+    // Seamless transition: Add new duration to the existing target end time
+    // This ensures no time is lost during notification processing
+    int next_duration_sec = pomodoro_initial_times[current_pomodoro_time_index];
+    ResetTimerState(next_duration_sec);
     
-    ResetTimerState(g_AppConfig.pomodoro.times[current_pomodoro_time_index]);
+    g_target_end_time += ((int64_t)next_duration_sec * 1000);
+    
     countdown_message_shown = FALSE;
     
     extern BOOL InitializeHighPrecisionTimer(void);
@@ -478,53 +468,37 @@ static BOOL HandleMainTimer(HWND hwnd) {
     BOOL overlapsTaskbar = EnforceTopmostOverTaskbar(hwnd);
     
     if (overlapsTaskbar && !topmost_fast_mode_active) {
-        /* Window entered taskbar area - start fast timer (50ms) */
         SetTimer(hwnd, TIMER_ID_TOPMOST_ENFORCE, 50, NULL);
         topmost_fast_mode_active = TRUE;
     } else if (!overlapsTaskbar && topmost_fast_mode_active) {
-        /* Window left taskbar area - stop fast timer */
         KillTimer(hwnd, TIMER_ID_TOPMOST_ENFORCE);
         topmost_fast_mode_active = FALSE;
     }
     
-    /* 
-     * Render throttling for heavy effects on large windows.
-     * When holographic effect is active and window is large, we skip some
-     * InvalidateRect calls to prevent mouse lag. The animation timer 
-     * (TIMER_ID_RENDER_ANIMATION) handles visual updates at appropriate rate.
-     */
     static DWORD s_lastRenderTime = 0;
-    DWORD now = GetTickCount();
+    DWORD now_tick = GetTickCount();
     BOOL shouldRender = TRUE;
     
-    extern BOOL CLOCK_HOLOGRAPHIC_EFFECT;
     if (CLOCK_HOLOGRAPHIC_EFFECT) {
         RECT rect;
         GetClientRect(hwnd, &rect);
         int pixels = rect.right * rect.bottom;
-        
-        /* Minimum interval between renders based on window size */
-        DWORD minInterval = (pixels < 30000) ? 0 :
-                            (pixels < 100000) ? 50 :
-                            (pixels < 300000) ? 100 : 150;
-        
-        if (minInterval > 0 && (now - s_lastRenderTime) < minInterval) {
-            shouldRender = FALSE;
-        }
+        DWORD minInterval = (pixels < 30000) ? 0 : (pixels < 100000) ? 50 : (pixels < 300000) ? 100 : 150;
+        if (minInterval > 0 && (now_tick - s_lastRenderTime) < minInterval) shouldRender = FALSE;
     }
     
     if (CLOCK_SHOW_CURRENT_TIME) {
         extern int last_displayed_second;
         last_displayed_second = -1;
         if (shouldRender) {
-            s_lastRenderTime = now;
+            s_lastRenderTime = now_tick;
             InvalidateRect(hwnd, NULL, TRUE);
         }
         return TRUE;
     }
     
     if (shouldRender) {
-        s_lastRenderTime = now;
+        s_lastRenderTime = now_tick;
         InvalidateRect(hwnd, NULL, TRUE);
     }
     
@@ -599,8 +573,16 @@ void InitializePomodoro(void) {
     pomodoro_initial_loop_count = (g_AppConfig.pomodoro.loop_count > 0) 
         ? g_AppConfig.pomodoro.loop_count : 1;
     
-    if (g_AppConfig.pomodoro.times_count > 0) {
-        CLOCK_TOTAL_TIME = g_AppConfig.pomodoro.times[0];
+    // Copy the entire times array to protect against config changes during run
+    memset(pomodoro_initial_times, 0, sizeof(pomodoro_initial_times));
+    int copy_count = (pomodoro_initial_times_count < MAX_POMODORO_TIMES) 
+        ? pomodoro_initial_times_count : MAX_POMODORO_TIMES;
+    for (int i = 0; i < copy_count; i++) {
+        pomodoro_initial_times[i] = g_AppConfig.pomodoro.times[i];
+    }
+    
+    if (pomodoro_initial_times_count > 0) {
+        CLOCK_TOTAL_TIME = pomodoro_initial_times[0];
     } else {
         CLOCK_TOTAL_TIME = DEFAULT_POMODORO_DURATION;
     }
