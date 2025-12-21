@@ -23,6 +23,9 @@
 #include "log.h"
 #include "window/window_desktop_integration.h"
 
+/* External function from timer.c */
+extern int64_t GetAbsoluteTimeMs(void);
+
 /* Pomodoro and timer constants */
 #define DEFAULT_POMODORO_DURATION 1500
 #define MAX_RETRY_ATTEMPTS 3
@@ -223,26 +226,6 @@ static BOOL HandleForceRedraw(HWND hwnd) {
         RedrawWindow(hwnd, NULL, NULL, RDW_ERASE | RDW_INVALIDATE | RDW_UPDATENOW);
         return TRUE;
     }
-    
-/** Faster updates in last 2 seconds for smoother UX */
-static void AdjustTimerIntervalForTail(HWND hwnd) {
-    if (g_AppConfig.display.time_format.show_milliseconds || CLOCK_COUNT_UP || CLOCK_SHOW_CURRENT_TIME || CLOCK_TOTAL_TIME == 0) {
-        if (!tail_fast_mode_active) return;
-        SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
-        tail_fast_mode_active = FALSE;
-        return;
-    }
-    
-    int remaining = CLOCK_TOTAL_TIME - countdown_elapsed_time;
-    
-    if (remaining <= TAIL_SEGMENT_THRESHOLD_SECONDS && remaining > 0 && !tail_fast_mode_active) {
-        SetTimer(hwnd, TIMER_ID_MAIN, TAIL_FAST_INTERVAL_MS, NULL);
-        tail_fast_mode_active = TRUE;
-    } else if (tail_fast_mode_active) {
-        SetTimer(hwnd, TIMER_ID_MAIN, GetTimerInterval(), NULL);
-        tail_fast_mode_active = FALSE;
-    }
-}
 
 static void HandleTimeoutActions(HWND hwnd) {
     switch (CLOCK_TIMEOUT_ACTION) {
@@ -250,7 +233,9 @@ static void HandleTimeoutActions(HWND hwnd) {
             break;
 
         case TIMEOUT_ACTION_LOCK:
-            LockWorkStation();
+            if (!LockWorkStation()) {
+                LOG_WARNING("Failed to lock workstation (error: %lu)", GetLastError());
+            }
             break;
 
         case TIMEOUT_ACTION_OPEN_FILE:
@@ -281,6 +266,7 @@ static void HandleTimeoutActions(HWND hwnd) {
             CLOCK_SHOW_CURRENT_TIME = FALSE;
             countup_elapsed_time = 0;
             elapsed_time = 0;
+            g_start_time = GetAbsoluteTimeMs();
             message_shown = FALSE;
             countdown_message_shown = FALSE;
             CLOCK_IS_PAUSED = FALSE;
@@ -291,13 +277,13 @@ static void HandleTimeoutActions(HWND hwnd) {
             break;
 
         case TIMEOUT_ACTION_OPEN_WEBSITE:
-            if (wcslen(CLOCK_TIMEOUT_WEBSITE_URL) > 0) {
-                HINSTANCE result = ShellExecuteW(NULL, L"open", CLOCK_TIMEOUT_WEBSITE_URL, NULL, NULL, SW_NORMAL);
+            if (strlen(CLOCK_TIMEOUT_WEBSITE_URL) > 0) {
+                wchar_t wUrl[MAX_PATH];
+                MultiByteToWideChar(CP_UTF8, 0, CLOCK_TIMEOUT_WEBSITE_URL, -1, wUrl, MAX_PATH);
+                HINSTANCE result = ShellExecuteW(NULL, L"open", wUrl, NULL, NULL, SW_NORMAL);
                 if ((INT_PTR)result <= 32) {
-                    char urlUtf8[MAX_PATH];
-                    WideCharToMultiByte(CP_UTF8, 0, CLOCK_TIMEOUT_WEBSITE_URL, -1, urlUtf8, MAX_PATH, NULL, NULL);
                     LOG_WARNING("Failed to open timeout website: %s (error: %d)", 
-                               urlUtf8, (int)(INT_PTR)result);
+                               CLOCK_TIMEOUT_WEBSITE_URL, (int)(INT_PTR)result);
                 }
             }
             break;
@@ -506,25 +492,9 @@ static BOOL HandleMainTimer(HWND hwnd) {
         return TRUE;
     }
     
-    DWORD current_tick = GetTickCount();
-    if (last_timer_tick == 0) {
-        last_timer_tick = current_tick;
-        return TRUE;
-    }
-    
-    DWORD elapsed_ms = current_tick - last_timer_tick;
-    last_timer_tick = current_tick;
-    ms_accumulator += elapsed_ms;
-    
-    AdjustTimerIntervalForTail(hwnd);
-    
-    if (ms_accumulator < 1000) return TRUE;
-    
-    const int seconds_to_add = 1;
-    // TODO: Why does the millisecond count up when the mode is count down?
-    if (g_AppConfig.display.time_format.show_milliseconds) {
-        ms_accumulator %= 1000;
-    }
+    /* ABSOLUTE TIME CALCULATION (MILLISECONDS) */
+    int64_t current_time_ms = GetAbsoluteTimeMs();
+    int current_elapsed_sec = 0;
 
     if (CLOCK_COUNT_UP) {
         countup_elapsed_time += seconds_to_add;

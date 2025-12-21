@@ -33,7 +33,8 @@
 extern BOOL CLOCK_SHOW_CURRENT_TIME;
 extern BOOL CLOCK_USE_24HOUR;
 extern char CLOCK_TEXT_COLOR[COLOR_HEX_BUFFER];
-extern wchar_t CLOCK_TIMEOUT_WEBSITE_URL[MAX_PATH];
+extern char CLOCK_TIMEOUT_WEBSITE_URL[MAX_PATH];
+extern char CLOCK_TIMEOUT_FILE_PATH[MAX_PATH];
 extern int current_pomodoro_time_index;
 extern POMODORO_PHASE current_pomodoro_phase;
 extern void GetConfigPath(char* path, size_t size);
@@ -69,6 +70,12 @@ void ReadTimeoutActionFromConfig() {
     } else {
         CLOCK_TIMEOUT_ACTION = TIMEOUT_ACTION_MESSAGE;
     }
+    
+    /* Hot-reload file path and website URL */
+    ReadIniString(INI_SECTION_TIMER, "CLOCK_TIMEOUT_FILE", "", 
+                  CLOCK_TIMEOUT_FILE_PATH, MAX_PATH, configPath);
+    ReadIniString(INI_SECTION_TIMER, "CLOCK_TIMEOUT_WEBSITE", "", 
+                  CLOCK_TIMEOUT_WEBSITE_URL, MAX_PATH, configPath);
 }
 
 /**
@@ -155,41 +162,37 @@ void BuildTimeoutActionSubmenu(HMENU hMenu) {
  * @param hMenu Parent menu handle
  */
 void BuildPresetManagementSubmenu(HMENU hMenu) {
+    extern char CLOCK_STARTUP_MODE[20];
+    
     HMENU hTimeOptionsMenu = CreatePopupMenu();
     AppendMenuW(hTimeOptionsMenu, MF_STRING, CLOCK_IDC_MODIFY_TIME_OPTIONS,
                 GetLocalizedString(NULL, L"Modify Quick Countdown Options"));
     
     HMENU hStartupSettingsMenu = CreatePopupMenu();
-
-    char configPath[MAX_PATH];
-    GetConfigPath(configPath, MAX_PATH);
     
-    char currentStartupMode[20] = "SHOW_TIME";
-    ReadIniString(INI_SECTION_TIMER, "STARTUP_MODE", "SHOW_TIME",
-                  currentStartupMode, sizeof(currentStartupMode), configPath);
-    
+    /* Use in-memory variable instead of reading config file each time */
     AppendMenuW(hStartupSettingsMenu, MF_STRING | 
-                (strcmp(currentStartupMode, "COUNTDOWN") == 0 ? MF_CHECKED : 0),
+                (strcmp(CLOCK_STARTUP_MODE, "COUNTDOWN") == 0 ? MF_CHECKED : 0),
                 CLOCK_IDC_SET_COUNTDOWN_TIME,
                 GetLocalizedString(NULL, L"Countdown"));
     
     AppendMenuW(hStartupSettingsMenu, MF_STRING | 
-                (strcmp(currentStartupMode, "COUNT_UP") == 0 ? MF_CHECKED : 0),
+                (strcmp(CLOCK_STARTUP_MODE, "COUNT_UP") == 0 ? MF_CHECKED : 0),
                 CLOCK_IDC_START_COUNT_UP,
                 GetLocalizedString(NULL, L"Stopwatch"));
     
     AppendMenuW(hStartupSettingsMenu, MF_STRING | 
-                (strcmp(currentStartupMode, "POMODORO") == 0 ? MF_CHECKED : 0),
+                (strcmp(CLOCK_STARTUP_MODE, "POMODORO") == 0 ? MF_CHECKED : 0),
                 CLOCK_IDC_START_POMODORO,
                 GetLocalizedString(NULL, L"Pomodoro"));
     
     AppendMenuW(hStartupSettingsMenu, MF_STRING | 
-                (strcmp(currentStartupMode, "SHOW_TIME") == 0 ? MF_CHECKED : 0),
+                (strcmp(CLOCK_STARTUP_MODE, "SHOW_TIME") == 0 ? MF_CHECKED : 0),
                 CLOCK_IDC_START_SHOW_TIME,
                 GetLocalizedString(NULL, L"Show Current Time"));
     
     AppendMenuW(hStartupSettingsMenu, MF_STRING | 
-                (strcmp(currentStartupMode, "NO_DISPLAY") == 0 ? MF_CHECKED : 0),
+                (strcmp(CLOCK_STARTUP_MODE, "NO_DISPLAY") == 0 ? MF_CHECKED : 0),
                 CLOCK_IDC_START_NO_DISPLAY,
                 GetLocalizedString(NULL, L"No Display"));
     

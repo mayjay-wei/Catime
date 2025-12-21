@@ -162,6 +162,11 @@ static const MessageDispatchEntry MESSAGE_DISPATCH_TABLE[] = {
     {CLOCK_WM_ANIMATION_PREVIEW_LOADED, HandleAnimationPreviewLoaded, "Animation preview loaded"},
     {CLOCK_WM_PLUGIN_EXIT, HandlePluginExitMessage, "Plugin exit via <exit> tag"},
     {CLOCK_WM_MAIN_TIMER_TICK, HandleMainTimerTick, "High-precision timer tick"},
+    /* Modeless dialog result handlers */
+    {WM_DIALOG_COUNTDOWN, HandleDialogCountdown, "Countdown dialog result"},
+    {WM_DIALOG_SHORTCUT, HandleDialogShortcut, "Shortcut time dialog result"},
+    {WM_DIALOG_COLOR, HandleDialogColor, "Color dialog result"},
+    {WM_DIALOG_UPDATE, HandleDialogUpdate, "Update dialog result"},
     {0, NULL, NULL}
 };
 
@@ -437,9 +442,8 @@ void ToggleMilliseconds(HWND hwnd) {
 }
 
 void ToggleTopmost(HWND hwnd) {
-    extern void WriteConfigTopmost(const char* value);
-    // Use "true"/"false" literals to avoid dependency on specific header macros if not present
-    WriteConfigTopmost(!CLOCK_WINDOW_TOPMOST ? "true" : "false");
+    extern void SetWindowTopmost(HWND hwnd, BOOL topmost);
+    SetWindowTopmost(hwnd, !CLOCK_WINDOW_TOPMOST);
 }
 
 void ToggleWindowVisibility(HWND hwnd) {
