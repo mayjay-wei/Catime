@@ -1,7 +1,7 @@
 /**
  * @file timer.c
  * @brief Multi-modal timer with high-precision tracking
- * 
+ *
  * QueryPerformanceCounter prevents drift in long-running timers.
  * Adaptive display formatting reduces visual jitter during transitions.
  */
@@ -14,47 +14,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <windows.h>
 #include <time.h>
 #include <stdint.h>
 
-#define SECONDS_PER_MINUTE 60
-#define SECONDS_PER_HOUR 3600
-#define MINUTES_PER_HOUR 60
+// #define SECONDS_PER_MINUTE 60
+// #define SECONDS_PER_HOUR 3600
+// #define MINUTES_PER_HOUR 60
 #define MILLISECONDS_PER_SECOND 1000.0
-#define DEFAULT_FALLBACK_TIME 60  /* 1 minute provides reasonable default when configuration is invalid */
+/* 1 minute provides reasonable default when configuration is invalid */
 
-BOOL CLOCK_IS_PAUSED = FALSE;
-BOOL CLOCK_SHOW_CURRENT_TIME = FALSE;
-BOOL CLOCK_USE_24HOUR = TRUE;
-BOOL CLOCK_SHOW_SECONDS = TRUE;
-BOOL CLOCK_COUNT_UP = FALSE;
+bool CLOCK_IS_PAUSED = false;
+bool CLOCK_SHOW_CURRENT_TIME = false;
+bool CLOCK_USE_24HOUR = true;
+bool CLOCK_SHOW_SECONDS = true;
+bool CLOCK_COUNT_UP = false;
 char CLOCK_STARTUP_MODE[20] = "SHOW_TIME";
 
-int CLOCK_TOTAL_TIME = 0;
-int countdown_elapsed_time = 0;
-int countup_elapsed_time = 0;
+int32_t CLOCK_TOTAL_TIME = 0;
+int32_t countdown_elapsed_time = 0;
+int32_t countup_elapsed_time = 0;
 time_t CLOCK_LAST_TIME_UPDATE = 0;
-int last_displayed_second = -1;
+int32_t last_displayed_second = -1;
 
-static LARGE_INTEGER timer_frequency = {0};
-static LARGE_INTEGER timer_last_count = {0};
-static BOOL high_precision_timer_initialized = FALSE;
+static LARGE_INTEGER timer_frequency = {};
+static LARGE_INTEGER timer_last_count = {};
+static bool high_precision_timer_initialized = false;
 static int64_t s_suspend_mono_ms = 0;
 static int64_t s_suspend_tick_ms = 0;
-static BOOL s_suspend_snapshot_valid = FALSE;
+static bool s_suspend_snapshot_valid = false;
 
-BOOL countdown_message_shown = FALSE;
-int pomodoro_work_cycles = 0;
+bool countdown_message_shown = false;
+int32_t pomodoro_work_cycles = 0;
 
 TimeoutActionType CLOCK_TIMEOUT_ACTION = TIMEOUT_ACTION_MESSAGE;
 char CLOCK_TIMEOUT_TEXT[50] = "";
 char CLOCK_TIMEOUT_FILE_PATH[MAX_PATH] = "";
 char CLOCK_TIMEOUT_WEBSITE_URL[MAX_PATH] = "";
 
-int time_options[MAX_TIME_OPTIONS] = {0};
-int time_options_count = 0;
+int32_t time_options[MAX_TIME_OPTIONS] = {};
+int32_t time_options_count = 0;
 
 /* Absolute Time State Definitions (Milliseconds) */
 int64_t g_target_end_time = 0;
@@ -69,10 +68,10 @@ int64_t GetAbsoluteTimeMs(void) {
         InitializeHighPrecisionTimer();
     }
 
-    if (high_precision_timer_initialized &&
-        timer_frequency.QuadPart > 0 &&
+    if (high_precision_timer_initialized && timer_frequency.QuadPart > 0 &&
         QueryPerformanceCounter(&nowCount)) {
-        return (int64_t)((nowCount.QuadPart * 1000LL) / timer_frequency.QuadPart);
+        return (int64_t)((nowCount.QuadPart * 1000LL) /
+                         timer_frequency.QuadPart);
     }
 
     return (int64_t)GetTickCount64();
@@ -81,26 +80,32 @@ int64_t GetAbsoluteTimeMs(void) {
 void Timer_OnSystemSuspend(void) {
     s_suspend_mono_ms = GetAbsoluteTimeMs();
     s_suspend_tick_ms = (int64_t)GetTickCount64();
-    s_suspend_snapshot_valid = TRUE;
+    s_suspend_snapshot_valid = true;
 }
 
 void Timer_OnSystemResume(void) {
-    if (!s_suspend_snapshot_valid) return;
+    if (!s_suspend_snapshot_valid)
+        return;
 
     int64_t now_mono_ms = GetAbsoluteTimeMs();
     int64_t now_tick_ms = (int64_t)GetTickCount64();
     int64_t mono_delta = now_mono_ms - s_suspend_mono_ms;
     int64_t tick_delta = now_tick_ms - s_suspend_tick_ms;
 
-    s_suspend_snapshot_valid = FALSE;
+    s_suspend_snapshot_valid = false;
 
-    if (mono_delta < 0) mono_delta = 0;
-    if (tick_delta < 0) tick_delta = 0;
+    if (mono_delta < 0)
+        mono_delta = 0;
+    if (tick_delta < 0)
+        tick_delta = 0;
 
-    /* Detect missed suspended duration if monotonic source under-counted sleep time. */
+    /* Detect missed suspended duration if monotonic source under-counted sleep
+     * time. */
     int64_t correction_ms = tick_delta - mono_delta;
-    if (correction_ms < 200) return;
-    if (CLOCK_IS_PAUSED || CLOCK_SHOW_CURRENT_TIME) return;
+    if (correction_ms < 200)
+        return;
+    if (CLOCK_IS_PAUSED || CLOCK_SHOW_CURRENT_TIME)
+        return;
 
     if (CLOCK_COUNT_UP) {
         g_start_time -= correction_ms;
@@ -113,19 +118,20 @@ void Timer_OnSystemResume(void) {
 }
 
 /** Reset QPC baseline to prevent time jumps after pause/resume */
-BOOL InitializeHighPrecisionTimer(void) {
+bool InitializeHighPrecisionTimer(void) {
     if (!QueryPerformanceFrequency(&timer_frequency)) {
-        return FALSE;
+        return false;
     }
     if (!QueryPerformanceCounter(&timer_last_count)) {
-        return FALSE;
+        return false;
     }
-    high_precision_timer_initialized = TRUE;
-    return TRUE;
+    high_precision_timer_initialized = true;
+    return true;
 }
 
-/** Leading spaces stabilize width when hours/minutes disappear during countdown */
-static void FormatTimeComponents(int hours, int minutes, int seconds, 
+/** Leading spaces stabilize width when hours/minutes disappear during countdown
+ */
+static void FormatTimeComponents(int hours, int minutes, int seconds,
                                  char* buffer, size_t buffer_size) {
     if (hours > 0) {
         snprintf(buffer, buffer_size, "%d:%02d:%02d", hours, minutes, seconds);
@@ -140,20 +146,24 @@ static void FormatTimeComponents(int hours, int minutes, int seconds,
     }
 }
 
-static int ConvertTo12HourFormat(int hour24) {
-    if (hour24 == 0) return 12;
-    if (hour24 > 12) return hour24 - 12;
+static int32_t ConvertTo12HourFormat(int32_t hour24) {
+    if (hour24 == 0)
+        return 12;
+    if (hour24 > 12)
+        return hour24 - 12;
     return hour24;
 }
 
-/** Cache displayed second to filter jitter from misaligned queries and refresh cycles */
+/** Cache displayed second to filter jitter from misaligned queries and refresh
+ * cycles */
 static void FormatSystemClock(char* time_text) {
     SYSTEMTIME st;
     GetLocalTime(&st);
     if (last_displayed_second != -1) {
         int expected_next = (last_displayed_second + 1) % SECONDS_PER_MINUTE;
-        BOOL is_rollover = (last_displayed_second == (SECONDS_PER_MINUTE - 1) && st.wSecond == 0);
-        
+        bool is_rollover = (last_displayed_second == (SECONDS_PER_MINUTE - 1) &&
+                            st.wSecond == 0);
+
         if (st.wSecond != expected_next && !is_rollover) {
             if (st.wSecond != last_displayed_second) {
                 last_displayed_second = st.wSecond;
@@ -164,11 +174,13 @@ static void FormatSystemClock(char* time_text) {
     } else {
         last_displayed_second = st.wSecond;
     }
-    
-    int display_hour = CLOCK_USE_24HOUR ? st.wHour : ConvertTo12HourFormat(st.wHour);
-    
+
+    int32_t display_hour =
+        CLOCK_USE_24HOUR ? st.wHour : ConvertTo12HourFormat(st.wHour);
+
     if (CLOCK_SHOW_SECONDS) {
-        snprintf(time_text, 64, "%d:%02d:%02d", display_hour, st.wMinute, last_displayed_second);
+        snprintf(time_text, 64, "%d:%02d:%02d", display_hour, st.wMinute,
+                 last_displayed_second);
     } else {
         snprintf(time_text, 64, "%d:%02d", display_hour, st.wMinute);
     }
@@ -176,34 +188,33 @@ static void FormatSystemClock(char* time_text) {
 
 static void FormatCountUpTime(char* time_text) {
     // Elapsed time is now updated by HandleMainTimer in timer_events.c
-    
-    int hours = countup_elapsed_time / SECONDS_PER_HOUR;
-    int minutes = (countup_elapsed_time % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
-    int seconds = countup_elapsed_time % SECONDS_PER_MINUTE;
-    
+
+    int32_t hours = countup_elapsed_time / SECONDS_PER_HOUR;
+    int32_t minutes =
+        (countup_elapsed_time % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
+    int32_t seconds = countup_elapsed_time % SECONDS_PER_MINUTE;
+
     FormatTimeComponents(hours, minutes, seconds, time_text, 64);
 }
 
 static void FormatCountdownTime(char* time_text) {
     // Elapsed time is now updated by HandleMainTimer in timer_events.c
-    
-    int remaining = CLOCK_TOTAL_TIME - countdown_elapsed_time;
+
+    int32_t remaining = CLOCK_TOTAL_TIME - countdown_elapsed_time;
     if (remaining <= 0) {
         snprintf(time_text, 64, "    0:00");
         return;
     }
-    
-    int hours = remaining / SECONDS_PER_HOUR;
-    int minutes = (remaining % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
-    int seconds = remaining % SECONDS_PER_MINUTE;
-    
+
+    int32_t hours = remaining / SECONDS_PER_HOUR;
+    int32_t minutes = (remaining % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
+    int32_t seconds = remaining % SECONDS_PER_MINUTE;
+
     FormatTimeComponents(hours, minutes, seconds, time_text, 64);
 }
 
 /** Dispatch to formatter based on current mode */
-void FormatTime(int remaining_time, char* time_text) {
-    (void)remaining_time;
-    
+void FormatTime([[maybe_unused]] int remaining_time, char* time_text) {
     if (CLOCK_SHOW_CURRENT_TIME) {
         FormatSystemClock(time_text);
     } else if (CLOCK_COUNT_UP) {
@@ -230,7 +241,8 @@ static int ParseAbsoluteTime(char* input) {
             return 0;
         }
         if (count == 0) {
-            if (value > 23) return 0;
+            if (value > 23)
+                return 0;
             hour = (int)value;
         } else if (count == 1) {
             minute = (int)value;
@@ -260,7 +272,8 @@ static int ParseAbsoluteTime(char* input) {
 
 /** Parse: "14 30t" (absolute), "1h 30m" (units), "25" or "1 30" (shorthand) */
 int ParseInput(const char* input, int* total_seconds) {
-    if (!TimeParser_Validate(input)) return 0;
+    if (!TimeParser_Validate(input))
+        return 0;
 
     char input_copy[256];
     strncpy(input_copy, input, sizeof(input_copy) - 1);
@@ -289,7 +302,8 @@ int ParseInput(const char* input, int* total_seconds) {
 void WriteConfigDefaultStartTime(int seconds) {
     char config_path[MAX_PATH];
     GetConfigPath(config_path, MAX_PATH);
-    WriteIniInt(INI_SECTION_TIMER, "CLOCK_DEFAULT_START_TIME", seconds, config_path);
+    WriteIniInt(INI_SECTION_TIMER, "CLOCK_DEFAULT_START_TIME", seconds,
+                config_path);
 }
 
 /** Fallback to DEFAULT_FALLBACK_TIME if countdown has invalid total time */
@@ -302,24 +316,25 @@ void ResetTimer(void) {
     } else {
         countdown_elapsed_time = 0;
         if (CLOCK_TOTAL_TIME <= 0) {
+            constexpr int32_t DEFAULT_FALLBACK_TIME = 60;
             CLOCK_TOTAL_TIME = DEFAULT_FALLBACK_TIME;
         }
         g_target_end_time = now + ((int64_t)CLOCK_TOTAL_TIME * 1000);
     }
-    
-    CLOCK_IS_PAUSED = FALSE;
-    countdown_message_shown = FALSE;
+
+    CLOCK_IS_PAUSED = false;
+    countdown_message_shown = false;
     g_pause_start_time = 0;
-    
+
     InitializeHighPrecisionTimer();
     ResetMillisecondAccumulator();
 }
 
 /** Reinitialize timing baseline on resume to prevent time jumps */
 void TogglePauseTimer(void) {
-    BOOL was_paused = CLOCK_IS_PAUSED;
+    bool was_paused = CLOCK_IS_PAUSED;
     CLOCK_IS_PAUSED = !CLOCK_IS_PAUSED;
-    
+
     int64_t now = GetAbsoluteTimeMs();
 
     if (CLOCK_IS_PAUSED && !was_paused) {

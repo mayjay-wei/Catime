@@ -25,13 +25,14 @@
 /* External function declarations */
 extern void GetActiveColor(char* outColor, size_t bufferSize);
 
-extern BOOL CLOCK_SHOW_CURRENT_TIME;
-extern BOOL CLOCK_COUNT_UP;
-extern BOOL CLOCK_IS_PAUSED;
+extern bool CLOCK_SHOW_CURRENT_TIME;
+extern bool CLOCK_COUNT_UP;
+extern bool CLOCK_IS_PAUSED;
 
 /* ============================================================================
  * Plugin Command Handlers
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Handle plugin start/stop toggle
@@ -41,11 +42,12 @@ static BOOL HandlePluginToggle(HWND hwnd, int pluginIndex) {
     if (PluginManager_IsPluginRunning(pluginIndex)) {
         PluginManager_StopPlugin(pluginIndex);
         PluginData_Clear();
-        
+
         /* Prevent countdown completion notification from triggering */
         countdown_message_shown = TRUE;
-        
-        /* Switch to idle state - don't reset timer to avoid 1-minute fallback */
+
+        /* Switch to idle state - don't reset timer to avoid 1-minute fallback
+         */
         CLOCK_SHOW_CURRENT_TIME = FALSE;
         CLOCK_COUNT_UP = FALSE;
         CLOCK_IS_PAUSED = TRUE;
@@ -61,26 +63,27 @@ static BOOL HandlePluginToggle(HWND hwnd, int pluginIndex) {
     if (PluginManager_NeedsSecurityCheck(pluginIndex)) {
         /* Show security dialog without changing current state */
         PluginManager_StartPlugin(pluginIndex);
-        /* State will be changed in HandleDialogPluginSecurity when user confirms */
+        /* State will be changed in HandleDialogPluginSecurity when user
+         * confirms */
         return TRUE;
     }
 
     /* Plugin is trusted - proceed with state change and launch */
-    
+
     /* Stop notification sound */
     StopNotificationSound();
-    
+
     /* Prevent countdown completion notification from triggering */
     countdown_message_shown = TRUE;
-    
+
     /* Reset timer flags */
     CLOCK_SHOW_CURRENT_TIME = FALSE;
     CLOCK_COUNT_UP = FALSE;
     CLOCK_IS_PAUSED = TRUE;
-    
+
     /* Stop internal timer */
     MainTimer_Stop();
-    
+
     /* Reset Pomodoro if active */
     current_pomodoro_phase = POMODORO_PHASE_IDLE;
 
@@ -94,17 +97,19 @@ static BOOL HandlePluginToggle(HWND hwnd, int pluginIndex) {
     BOOL hasPluginInfo = PluginManager_CopyPlugin(pluginIndex, &pluginInfo);
     if (hasPluginInfo) {
         wchar_t loadingText[256];
-        _snwprintf_s(loadingText, 256, _TRUNCATE, L"Loading %ls...", pluginInfo.displayName);
+        _snwprintf_s(loadingText, 256, _TRUNCATE, L"Loading %ls...",
+                     pluginInfo.displayName);
         PluginData_SetText(loadingText);
     }
-    
+
     /* Start plugin */
     BOOL startResult = PluginManager_StartPlugin(pluginIndex);
-    
+
     if (!startResult) {
         /* Launch failed - show error */
-        LOG_ERROR("Plugin failed to start: %ls", hasPluginInfo ? pluginInfo.displayName : L"unknown");
-        
+        LOG_ERROR("Plugin failed to start: %ls",
+                  hasPluginInfo ? pluginInfo.displayName : L"unknown");
+
         const wchar_t* errorMsg = PluginProcess_GetLastError();
         if (errorMsg && errorMsg[0] != L'\0') {
             PluginData_SetText(errorMsg);
@@ -113,18 +118,18 @@ static BOOL HandlePluginToggle(HWND hwnd, int pluginIndex) {
         }
         PluginData_SetActive(TRUE);
     }
-    
+
     /* Check if animated gradient needs timer for smooth animation */
     char activeColor[COLOR_HEX_BUFFER];
     GetActiveColor(activeColor, sizeof(activeColor));
     if (IsGradientAnimated(GetGradientTypeByName(activeColor))) {
-        MainTimer_Start(hwnd, 66);  /* 15 FPS for smooth animation */
+        MainTimer_Start(hwnd, 66); /* 15 FPS for smooth animation */
     }
-    
+
     /* Ensure window visible and consistent with topmost policy */
     EnsureWindowVisibleWithTopmostState(hwnd);
     InvalidateRect(hwnd, NULL, TRUE);
-    
+
     return TRUE;
 }
 
@@ -135,7 +140,7 @@ static BOOL HandleShowPluginFile(HWND hwnd) {
     /* Check if already in show file mode */
     BOOL isShowFileMode = PluginData_IsActive();
     BOOL anyPluginRunning = FALSE;
-    
+
     int pluginCount = PluginManager_GetPluginCount();
     for (int i = 0; i < pluginCount; i++) {
         if (PluginManager_IsPluginRunning(i)) {
@@ -143,20 +148,21 @@ static BOOL HandleShowPluginFile(HWND hwnd) {
             break;
         }
     }
-    
+
     if (isShowFileMode && !anyPluginRunning) {
         /* Toggle off */
         BOOL hadCatimeTag = PluginData_HasCatimeTag();
         PluginData_Clear();
-        
+
         /* Prevent countdown completion notification from triggering */
         countdown_message_shown = TRUE;
-        
+
         if (hadCatimeTag) {
             /* Had <catime> tag - restore time display, keep timer */
             InvalidateRect(hwnd, NULL, TRUE);
         } else {
-            /* No <catime> tag - switch to idle, don't reset timer to avoid 1-minute fallback */
+            /* No <catime> tag - switch to idle, don't reset timer to avoid
+             * 1-minute fallback */
             CLOCK_SHOW_CURRENT_TIME = FALSE;
             CLOCK_COUNT_UP = FALSE;
             CLOCK_IS_PAUSED = TRUE;
@@ -167,14 +173,14 @@ static BOOL HandleShowPluginFile(HWND hwnd) {
         }
         return TRUE;
     }
-    
+
     /* Toggle on - activate show file mode */
     PluginManager_StopAllPlugins();
     PluginData_SetActive(TRUE);
-    
+
     /* Prevent countdown completion notification from triggering */
     countdown_message_shown = TRUE;
-    
+
     /* Check for <catime> tag */
     if (!PluginData_HasCatimeTag()) {
         MainTimer_Stop();
@@ -182,23 +188,24 @@ static BOOL HandleShowPluginFile(HWND hwnd) {
         CLOCK_COUNT_UP = FALSE;
         CLOCK_IS_PAUSED = FALSE;
     }
-    
+
     /* Check if animated gradient needs timer for smooth animation */
     char activeColor[COLOR_HEX_BUFFER];
     GetActiveColor(activeColor, sizeof(activeColor));
     if (IsGradientAnimated(GetGradientTypeByName(activeColor))) {
-        MainTimer_Start(hwnd, 66);  /* 15 FPS for smooth animation */
+        MainTimer_Start(hwnd, 66); /* 15 FPS for smooth animation */
     }
-    
+
     EnsureWindowVisibleWithTopmostState(hwnd);
     InvalidateRect(hwnd, NULL, TRUE);
-    
+
     return TRUE;
 }
 
 /* ============================================================================
  * Plugin Exit Handler (for <exit> tag)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Handle plugin exit request (from <exit> tag countdown)
@@ -207,16 +214,16 @@ static BOOL HandleShowPluginFile(HWND hwnd) {
 void HandlePluginExit(HWND hwnd) {
     /* Cancel any pending exit countdown */
     PluginExit_Cancel();
-    
+
     /* Stop all plugins */
     PluginManager_StopAllPlugins();
-    
+
     /* Clear plugin data */
     PluginData_Clear();
-    
+
     /* Prevent countdown completion notification from triggering */
     countdown_message_shown = TRUE;
-    
+
     /* Switch to idle state - don't reset timer to avoid 1-minute fallback */
     CLOCK_SHOW_CURRENT_TIME = FALSE;
     CLOCK_COUNT_UP = FALSE;
@@ -225,23 +232,26 @@ void HandlePluginExit(HWND hwnd) {
     countdown_elapsed_time = 0;
     MainTimer_Stop();
     InvalidateRect(hwnd, NULL, TRUE);
-    
+
     LOG_INFO("Plugin exit completed via <exit> tag");
 }
 
 /* ============================================================================
  * Plugin Command Dispatcher
- * ============================================================================ */
+ * ============================================================================
+ */
 
 BOOL HandlePluginCommand(HWND hwnd, UINT cmd) {
     /* Plugin start/stop */
-    if (cmd >= CLOCK_IDM_PLUGINS_BASE && cmd < CLOCK_IDM_PLUGINS_SETTINGS_BASE) {
+    if (cmd >= CLOCK_IDM_PLUGINS_BASE &&
+        cmd < CLOCK_IDM_PLUGINS_SETTINGS_BASE) {
         int pluginIndex = cmd - CLOCK_IDM_PLUGINS_BASE;
         return HandlePluginToggle(hwnd, pluginIndex);
     }
 
     /* Plugin settings (deprecated but kept for safety) */
-    if (cmd >= CLOCK_IDM_PLUGINS_SETTINGS_BASE && cmd < CLOCK_IDM_PLUGINS_SHOW_FILE) {
+    if (cmd >= CLOCK_IDM_PLUGINS_SETTINGS_BASE &&
+        cmd < CLOCK_IDM_PLUGINS_SHOW_FILE) {
         return TRUE;
     }
 

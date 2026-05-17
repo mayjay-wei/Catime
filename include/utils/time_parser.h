@@ -16,15 +16,17 @@
 
 /* ============================================================================
  * Time Unit Constants
- * ============================================================================ */
+ * ============================================================================
+ */
 
-#define SECONDS_PER_MINUTE 60
-#define SECONDS_PER_HOUR 3600
-#define SECONDS_PER_DAY 86400
+#define SECONDS_PER_MINUTE 60u
+#define SECONDS_PER_HOUR 3600u
+#define SECONDS_PER_DAY 86400u
 
 /* ============================================================================
  * Core Parsing Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Parse basic time input with units
@@ -52,7 +54,8 @@ BOOL TimeParser_ParseBasic(const char* input, int* seconds);
  *
  * @details Supported formats include all basic formats plus:
  * - Absolute time: "14 30t" (countdown to 14:30)
- * - Numeric shorthand: "25" (25 minutes), "130 20" (130 minutes 20 seconds), "1 30 15" (1 hour 30 minutes 15 seconds)
+ * - Numeric shorthand: "25" (25 minutes), "130 20" (130 minutes 20 seconds), "1
+ * 30 15" (1 hour 30 minutes 15 seconds)
  *
  * @note Used for main countdown dialog with extended features
  */
@@ -60,7 +63,8 @@ BOOL TimeParser_ParseAdvanced(const char* input, int* seconds);
 
 /* ============================================================================
  * Validation Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Validate if input string can be parsed
@@ -85,7 +89,8 @@ BOOL TimeParser_HasUnits(const char* input);
 
 /* ============================================================================
  * Formatting Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Format seconds to compact string representation
@@ -119,7 +124,8 @@ void TimeParser_FormatToHMS(int seconds, int* hours, int* mins, int* secs);
 
 /* ============================================================================
  * Utility Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get multiplier for time unit

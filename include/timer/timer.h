@@ -1,10 +1,11 @@
 /**
  * @file timer.h
  * @brief Multi-modal timer with flexible input parsing
- * 
+ *
  * QueryPerformanceCounter provides sub-millisecond accuracy (prevents drift).
  * Multi-format parser accepts duration, absolute time, and unit combinations.
- * Adaptive formatting prevents visual jumps (aligned spacing, magnitude-based format).
+ * Adaptive formatting prevents visual jumps (aligned spacing, magnitude-based
+ * format).
  */
 
 #ifndef TIMER_H
@@ -15,13 +16,15 @@
 
 /* ============================================================================
  * Constants
- * ============================================================================ */
+ * ============================================================================
+ */
 
 #define MAX_TIME_OPTIONS 50
 
 /* ============================================================================
  * Types
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Timeout action types
@@ -40,39 +43,40 @@ typedef enum {
 
 /* ============================================================================
  * Global State Variables
- * ============================================================================ */
+ * ============================================================================
+ */
 
 #include <time.h>
 #include <stdint.h>
 
 /* Global Timer State */
-extern BOOL CLOCK_IS_PAUSED;
-extern BOOL CLOCK_SHOW_CURRENT_TIME;
-extern BOOL CLOCK_USE_24HOUR;
-extern BOOL CLOCK_SHOW_SECONDS;
-extern BOOL CLOCK_COUNT_UP;
+extern bool CLOCK_IS_PAUSED;
+extern bool CLOCK_SHOW_CURRENT_TIME;
+extern bool CLOCK_USE_24HOUR;
+extern bool CLOCK_SHOW_SECONDS;
+extern bool CLOCK_COUNT_UP;
 extern char CLOCK_STARTUP_MODE[20];
 
-extern int CLOCK_TOTAL_TIME;
-extern int countdown_elapsed_time;
-extern int countup_elapsed_time;
+extern int32_t CLOCK_TOTAL_TIME;
+extern int32_t countdown_elapsed_time;
+extern int32_t countup_elapsed_time;
 
 /* Absolute Time State for Drift-Free Timing (Milliseconds) */
-extern int64_t g_target_end_time;  /* For Countdown: When the timer should end */
-extern int64_t g_start_time;       /* For CountUp: When the timer started */
+extern int64_t g_target_end_time; /* For Countdown: When the timer should end */
+extern int64_t g_start_time;      /* For CountUp: When the timer started */
 extern int64_t g_pause_start_time; /* Timestamp when pause began */
 
 /* Monotonic absolute time source (milliseconds) */
 int64_t GetAbsoluteTimeMs(void);
 
 extern time_t CLOCK_LAST_TIME_UPDATE;
-extern int last_displayed_second;
+extern int32_t last_displayed_second;
 
 /* Notification state (prevent duplicates) */
-extern BOOL countdown_message_shown;
-extern int pomodoro_work_cycles;
-extern int message_shown;
-extern int elapsed_time;
+extern bool countdown_message_shown;
+extern int32_t pomodoro_work_cycles;
+extern int32_t message_shown;
+extern int32_t elapsed_time;
 
 /* Input dialog */
 extern wchar_t inputText[256];
@@ -87,23 +91,24 @@ extern char CLOCK_TIMEOUT_WEBSITE_URL[MAX_PATH];
 /* Pomodoro settings - now in g_AppConfig.pomodoro */
 
 /* Quick presets */
-extern int time_options[MAX_TIME_OPTIONS];
-extern int time_options_count;
+extern int32_t time_options[MAX_TIME_OPTIONS];
+extern int32_t time_options_count;
 
 /* ============================================================================
  * Public API Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Format time by mode (adaptive alignment)
  * @param remaining_time Unused (legacy API compatibility)
  * @param time_text Output buffer (min 64 bytes)
- * 
+ *
  * @details Modes:
  * - SHOW_CURRENT_TIME: H:MM or H:MM:SS
  * - COUNT_UP: S, M:SS, or H:MM:SS (magnitude-based)
  * - Default: Countdown with leading spaces (visual alignment)
- * 
+ *
  * @note Uses cached last_displayed_second (reduces system calls)
  * @warning Not thread-safe
  */
@@ -132,7 +137,7 @@ void WriteConfigDefaultStartTime(int seconds);
 
 /**
  * @brief Reset timer to initial state
- * 
+ *
  * @details
  * Clears elapsed time, ensures valid CLOCK_TOTAL_TIME (fallback 60s),
  * unpauses, clears notification flags, reinitializes baseline.
@@ -141,7 +146,7 @@ void ResetTimer(void);
 
 /**
  * @brief Toggle pause state
- * 
+ *
  * @details
  * Pause: Freezes millisecond display, stops accumulation.
  * Resume: Resets baseline to prevent time jumps.
@@ -151,12 +156,12 @@ void TogglePauseTimer(void);
 /**
  * @brief Initialize high-precision counter
  * @return TRUE on success, FALSE if unsupported
- * 
+ *
  * @details
  * Establishes timing baseline via QueryPerformanceCounter.
  * Call when starting/resuming timer.
  */
-BOOL InitializeHighPrecisionTimer(void);
+bool InitializeHighPrecisionTimer(void);
 
 /**
  * @brief Record timer baseline when system is about to suspend

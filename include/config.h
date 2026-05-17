@@ -1,10 +1,10 @@
 /**
  * @file config.h
  * @brief INI-based configuration system with atomic updates
- * 
- * Atomic writes (temp file + rename) prevent corruption during concurrent access.
- * UTF-8 throughout for international path/text support.
- * Mutex synchronization prevents race conditions between processes.
+ *
+ * Atomic writes (temp file + rename) prevent corruption during concurrent
+ * access. UTF-8 throughout for international path/text support. Mutex
+ * synchronization prevents race conditions between processes.
  */
 
 #ifndef CONFIG_H
@@ -24,70 +24,74 @@
 
 /* ============================================================================
  * Constants
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief MRU list capacity */
 #define MAX_RECENT_FILES 5
 
 /* ============================================================================
  * Default configuration values
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Default notification messages */
-#define DEFAULT_TIMEOUT_MESSAGE        "Ding! Time's up~"
+#define DEFAULT_TIMEOUT_MESSAGE "Ding! Time's up~"
 
 /** @brief Resource path prefixes */
-#define LOCALAPPDATA_PREFIX            "%LOCALAPPDATA%\\Catime"
-#define FONTS_PATH_PREFIX              "%LOCALAPPDATA%\\Catime\\resources\\fonts\\"
-#define AUDIO_PATH_PREFIX              "%LOCALAPPDATA%\\Catime\\resources\\audio\\"
-#define ANIMATIONS_PATH_PREFIX         "%LOCALAPPDATA%\\Catime\\resources\\animations\\"
+#define LOCALAPPDATA_PREFIX "%LOCALAPPDATA%\\Catime"
+#define FONTS_PATH_PREFIX "%LOCALAPPDATA%\\Catime\\resources\\fonts\\"
+#define AUDIO_PATH_PREFIX "%LOCALAPPDATA%\\Catime\\resources\\audio\\"
+#define ANIMATIONS_PATH_PREFIX "%LOCALAPPDATA%\\Catime\\resources\\animations\\"
 
 /** @brief Default color values */
-#define DEFAULT_TEXT_COLOR             "#648CFF_#64DC78"
-#define DEFAULT_WHITE_COLOR            "#FFFFFF"
-#define DEFAULT_BLACK_COLOR            "#000000"
+#define DEFAULT_TEXT_COLOR "#648CFF_#64DC78"
+#define DEFAULT_WHITE_COLOR "#FFFFFF"
+#define DEFAULT_BLACK_COLOR "#000000"
 
 /** @brief Default font settings */
-#define DEFAULT_FONT_NAME              "Rubik Glitch Essence.ttf"
-#define DEFAULT_FONT_SIZE              20
+#define DEFAULT_FONT_NAME "Rubik Glitch Essence.ttf"
+#define DEFAULT_FONT_SIZE 20
 
 /** @brief Default window settings
  * - Position -2: Golden ratio (0.618 from left)
  * - Position -1: Near top of screen
  */
-#define DEFAULT_WINDOW_SCALE           "1.62"
-#define DEFAULT_PLUGIN_SCALE           "1.0"
-#define DEFAULT_WINDOW_POS_X           -2
-#define DEFAULT_WINDOW_POS_Y           -1
-#define DEFAULT_MOVE_STEP_SMALL        10
-#define DEFAULT_MOVE_STEP_LARGE        50
-#define DEFAULT_SCALE_STEP_NORMAL      10
-#define DEFAULT_SCALE_STEP_FAST        15
+#define DEFAULT_WINDOW_SCALE "1.62"
+#define DEFAULT_PLUGIN_SCALE "1.0"
+#define DEFAULT_WINDOW_POS_X -2
+#define DEFAULT_WINDOW_POS_Y -1
+#define DEFAULT_MOVE_STEP_SMALL 10
+#define DEFAULT_MOVE_STEP_LARGE 50
+#define DEFAULT_SCALE_STEP_NORMAL 10
+#define DEFAULT_SCALE_STEP_FAST 15
 
 /** @brief Default color palette: 8 solid + 20 gradients, sorted by hue */
-#define DEFAULT_COLOR_OPTIONS_INI \
+#define DEFAULT_COLOR_OPTIONS_INI                                              \
     "#FFFFFF,#E3E3E5,#000000,#FF5F5F,#F6ABB7,#FB7FA4,#F59E0B,#22C55E,#8771C6," \
-    "#FF9A9E_#FECFEF,#FEA5B7_#FFDE9B,#A8EDEA_#FED6E3,#D299C2_#FEF9D7," \
-    "#FF9966_#FF5E62,#ED4264_#FFEDBC,#F6D365_#FDA085,#FFE985_#FA742B,#FF9A56_#56CCBA," \
-    "#10BD92_#8CE442,#11998E_#38EF7D,#43E97B_#38F9D7," \
-    "#89F7FE_#66A6FF,#00C9FF_#92FE9D,#648CFF_#64DC78,#1F92A9_#EEE0D5," \
-    "#8E9EF3_#F774A0,#FF5E96_#56C6FF,#30CFD0_#330867," \
+    "#FF9A9E_#FECFEF,#FEA5B7_#FFDE9B,#A8EDEA_#FED6E3,#D299C2_#FEF9D7,"         \
+    "#FF9966_#FF5E62,#ED4264_#FFEDBC,#F6D365_#FDA085,#FFE985_#FA742B,#FF9A56_" \
+    "#56CCBA,"                                                                 \
+    "#10BD92_#8CE442,#11998E_#38EF7D,#43E97B_#38F9D7,"                         \
+    "#89F7FE_#66A6FF,#00C9FF_#92FE9D,#648CFF_#64DC78,#1F92A9_#EEE0D5,"         \
+    "#8E9EF3_#F774A0,#FF5E96_#56C6FF,#30CFD0_#330867,"                         \
     "#FFA745_#FE869F_#EF7AC8_#A083ED_#43AEFF"
 
 /** @brief INI section names for logical grouping */
-#define INI_SECTION_GENERAL       "General"
-#define INI_SECTION_DISPLAY       "Display"
-#define INI_SECTION_TIMER         "Timer"
-#define INI_SECTION_POMODORO      "Pomodoro"
-#define INI_SECTION_NOTIFICATION  "Notification"
-#define INI_SECTION_HOTKEYS       "Hotkeys"
-#define INI_SECTION_RECENTFILES   "RecentFiles"
-#define INI_SECTION_COLORS        "Colors"
-#define INI_SECTION_OPTIONS       "Options"
+#define INI_SECTION_GENERAL "General"
+#define INI_SECTION_DISPLAY "Display"
+#define INI_SECTION_TIMER "Timer"
+#define INI_SECTION_POMODORO "Pomodoro"
+#define INI_SECTION_NOTIFICATION "Notification"
+#define INI_SECTION_HOTKEYS "Hotkeys"
+#define INI_SECTION_RECENTFILES "RecentFiles"
+#define INI_SECTION_COLORS "Colors"
+#define INI_SECTION_OPTIONS "Options"
 
 /* ============================================================================
  * Type definitions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief MRU list entry
@@ -130,7 +134,8 @@ typedef enum {
 
 /* ============================================================================
  * Refactored configuration structures
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Recent files state
@@ -202,8 +207,8 @@ typedef struct {
  * @brief Plugin trust entry
  */
 typedef struct {
-    char path[MAX_PATH];    /**< Plugin file path */
-    char sha256[65];        /**< SHA256 hash of plugin file (hex string) */
+    char path[MAX_PATH]; /**< Plugin file path */
+    char sha256[65];     /**< SHA256 hash of plugin file (hex string) */
 } PluginTrustEntry;
 
 /**
@@ -234,7 +239,7 @@ typedef struct {
     int opacity_step_fast;
     int scale_step_normal;
     int scale_step_fast;
-    int text_effect;  /* TextEffectType enum value */
+    int text_effect; /* TextEffectType enum value */
 } DisplayConfig;
 
 /**
@@ -246,7 +251,7 @@ typedef struct {
 
 /**
  * @brief Main application configuration
- * 
+ *
  * @details
  * Single source of truth for all configuration state.
  * Thread-safe when accessed through config functions.
@@ -264,12 +269,13 @@ typedef struct {
 
 /* ============================================================================
  * Global state variables
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Global application configuration instance */
 extern AppConfig g_AppConfig;
 
-/** 
+/**
  * @brief Flag to trigger factory reset after window creation
  * Set by ReadConfig when version mismatch and forced reset is active.
  * Handled by SetupMainWindow.
@@ -278,7 +284,8 @@ extern BOOL g_PerformFactoryReset;
 
 /* ============================================================================
  * Animation speed functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get animation speed metric from config
@@ -300,7 +307,7 @@ void WriteConfigAnimationSpeedMetric(AnimationSpeedMetric metric);
  * @brief Map utilization percent to animation speed scale
  * @param percent Utilization (0-100)
  * @return Speed scale (50.0=half, 100.0=normal, 200.0=double)
- * 
+ *
  * @details
  * Uses range mappings from [Animation] section.
  * Example: ANIMATION_SPEED_MAP_0-20 = 50 (0-20% usage → 50% speed)
@@ -310,7 +317,7 @@ double GetAnimationSpeedScaleForPercent(double percent);
 
 /**
  * @brief Reload animation mappings from config
- * 
+ *
  * @details Thread-safe. Call after config changes.
  */
 void ReloadAnimationSpeedFromConfig(void);
@@ -323,13 +330,14 @@ void WriteAnimationSpeedToConfig(const char* config_path);
 
 /* ============================================================================
  * Core configuration functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get config file path (auto-creates directory)
  * @param path Output buffer (UTF-8)
  * @param size Buffer size
- * 
+ *
  * @details Returns %APPDATA%\Catime\config.ini
  */
 void GetConfigPath(char* path, size_t size);
@@ -358,7 +366,8 @@ void CheckAndCreateResourceFolders(void);
 /**
  * @brief Update config key-value atomically (internal helper)
  */
-BOOL UpdateConfigKeyValueAtomic(const char* section, const char* key, const char* value);
+BOOL UpdateConfigKeyValueAtomic(const char* section, const char* key,
+                                const char* value);
 
 /**
  * @brief Update config integer value atomically (internal helper)
@@ -372,19 +381,19 @@ BOOL UpdateConfigBoolAtomic(const char* section, const char* key, BOOL value);
 
 /**
  * @brief Load all configuration with validation
- * 
+ *
  * @details
  * Loads all settings (language, timers, hotkeys, etc.).
  * Creates default config if missing.
  * Validates and sanitizes all values.
- * 
+ *
  * @note Call during app initialization
  */
 void ReadConfig();
 
 /**
  * @brief Create resource folders (idempotent)
- * 
+ *
  * @details Creates %APPDATA%\Catime\resources\{audio,fonts,animations}
  */
 void CheckAndCreateAudioFolder();
@@ -417,7 +426,7 @@ void WriteConfigTimeOptions(const char* options);
 
 /**
  * @brief Load recent files with validation
- * 
+ *
  * @details
  * Reads RecentFile1-5, validates existence, updates menu.
  */
@@ -426,7 +435,7 @@ void LoadRecentFiles(void);
 /**
  * @brief Add file to MRU list (atomic)
  * @param filePath Path to add (UTF-8)
- * 
+ *
  * @details
  * Adds to top, removes duplicates, maintains limit, updates menu.
  */
@@ -434,13 +443,14 @@ void SaveRecentFile(const char* filePath);
 
 /* ============================================================================
  * Utility functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Convert UTF-8 to ANSI (caller must free)
  * @param utf8Str UTF-8 string
  * @return Allocated ANSI string or NULL on failure
- * 
+ *
  * @note For legacy API compatibility
  */
 char* UTF8ToANSI(const char* utf8Str);
@@ -448,7 +458,7 @@ char* UTF8ToANSI(const char* utf8Str);
 /**
  * @brief Create default config with language auto-detection
  * @param config_path Path (UTF-8)
- * 
+ *
  * @details
  * Creates default settings (25min timer, 25/5/15 Pomodoro, hotkeys, colors).
  * Only creates if doesn't exist.
@@ -458,7 +468,7 @@ void CreateDefaultConfig(const char* config_path);
 /**
  * @brief Write complete config atomically
  * @param config_path Path (UTF-8)
- * 
+ *
  * @details
  * Writes to temp file, then atomically renames. Mutex-protected.
  */
@@ -466,7 +476,8 @@ void WriteConfig(const char* config_path);
 
 /* ============================================================================
  * Specific configuration writers (Pomodoro, Timer, Window)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Write Pomodoro times atomically
@@ -479,7 +490,8 @@ void WriteConfigPomodoroTimes(int work, int short_break, int long_break);
 /**
  * @brief Write Pomodoro settings (4-parameter version)
  */
-void WriteConfigPomodoroSettings(int work, int short_break, int long_break, int long_break2);
+void WriteConfigPomodoroSettings(int work, int short_break, int long_break,
+                                 int long_break2);
 
 /**
  * @brief Write Pomodoro loop count (1-99)
@@ -515,7 +527,8 @@ void WriteConfigPomodoroTimeOptions(const int* times, int count);
 
 /* ============================================================================
  * Notification configuration functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Write notification timeout
@@ -583,14 +596,15 @@ void WriteConfigNotificationWindow(int x, int y, int width, int height);
 
 /* ============================================================================
  * Hotkey configuration functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Convert hotkey to string (e.g., "Ctrl+A")
  * @param hotkey Hotkey value (LOWORD=VK, HIWORD=modifiers)
  * @param buffer Output buffer
  * @param bufferSize Buffer size
- * 
+ *
  * @details Returns "None" for 0.
  */
 void HotkeyToString(WORD hotkey, char* buffer, size_t bufferSize);
@@ -599,7 +613,7 @@ void HotkeyToString(WORD hotkey, char* buffer, size_t bufferSize);
  * @brief Parse hotkey string to WORD
  * @param str String like "Ctrl+Shift+A" or "None"
  * @return Hotkey value (LOWORD=VK, HIWORD=modifiers)
- * 
+ *
  * @details
  * Case-insensitive, tolerates whitespace and various separators.
  * Returns 0 for "None" or empty.
@@ -609,11 +623,13 @@ WORD StringToHotkey(const char* str);
 /**
  * @brief Read all 12 hotkeys from config (uses defaults if missing)
  */
-void ReadConfigHotkeys(WORD* showTimeHotkey, WORD* countUpHotkey, WORD* countdownHotkey,
-                      WORD* quickCountdown1Hotkey, WORD* quickCountdown2Hotkey, WORD* quickCountdown3Hotkey,
-                      WORD* pomodoroHotkey, WORD* toggleVisibilityHotkey, WORD* editModeHotkey,
-                      WORD* pauseResumeHotkey, WORD* restartTimerHotkey, WORD* toggleMillisecondsHotkey,
-                      WORD* toggleTopmostHotkey);
+void ReadConfigHotkeys(WORD* showTimeHotkey, WORD* countUpHotkey,
+                       WORD* countdownHotkey, WORD* quickCountdown1Hotkey,
+                       WORD* quickCountdown2Hotkey, WORD* quickCountdown3Hotkey,
+                       WORD* pomodoroHotkey, WORD* toggleVisibilityHotkey,
+                       WORD* editModeHotkey, WORD* pauseResumeHotkey,
+                       WORD* restartTimerHotkey, WORD* toggleMillisecondsHotkey,
+                       WORD* toggleTopmostHotkey);
 
 /**
  * @brief Read custom countdown hotkey
@@ -624,17 +640,19 @@ void ReadCustomCountdownHotkey(WORD* hotkey);
 /**
  * @brief Write all 12 hotkeys atomically (0 = "None")
  */
-void WriteConfigHotkeys(WORD showTimeHotkey, WORD countUpHotkey, WORD countdownHotkey,
-                        WORD quickCountdown1Hotkey, WORD quickCountdown2Hotkey, WORD quickCountdown3Hotkey,
-                        WORD pomodoroHotkey, WORD toggleVisibilityHotkey, WORD editModeHotkey,
-                        WORD pauseResumeHotkey, WORD restartTimerHotkey, WORD toggleMillisecondsHotkey,
+void WriteConfigHotkeys(WORD showTimeHotkey, WORD countUpHotkey,
+                        WORD countdownHotkey, WORD quickCountdown1Hotkey,
+                        WORD quickCountdown2Hotkey, WORD quickCountdown3Hotkey,
+                        WORD pomodoroHotkey, WORD toggleVisibilityHotkey,
+                        WORD editModeHotkey, WORD pauseResumeHotkey,
+                        WORD restartTimerHotkey, WORD toggleMillisecondsHotkey,
                         WORD toggleTopmostHotkey);
 
 /**
  * @brief Write key-value pair (auto-determines section, atomic)
  * @param key Key name
  * @param value Value
- * 
+ *
  * @note Prefer specific Write* functions when available
  */
 void WriteConfigKeyValue(const char* key, const char* value);
@@ -643,51 +661,53 @@ void WriteConfigKeyValue(const char* key, const char* value);
  * @brief Check if shortcut prompt shown (one-time dialog)
  * @return TRUE if done
  */
-BOOL IsShortcutCheckDone(void);
+bool IsShortcutCheckDone(void);
 
 /**
  * @brief Mark shortcut prompt as done
  * @param done TRUE to prevent future prompts
  */
-void SetShortcutCheckDone(BOOL done);
+void SetShortcutCheckDone(bool done);
 
 /* ============================================================================
  * Low-level INI file I/O functions (UTF-8 support)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Read INI string with UTF-8 support
  * @return Characters copied (excluding null)
- * 
+ *
  * @note Thread-safe but not process-safe without mutex
  */
-DWORD ReadIniString(const char* section, const char* key, const char* defaultValue,
-                  char* returnValue, DWORD returnSize, const char* filePath);
+DWORD ReadIniString(const char* section, const char* key,
+                    const char* defaultValue, char* returnValue,
+                    DWORD returnSize, const char* filePath);
 
 /**
  * @brief Write INI string with UTF-8 support (NOT atomic)
  * @return TRUE on success
  */
 BOOL WriteIniString(const char* section, const char* key, const char* value,
-                  const char* filePath);
+                    const char* filePath);
 
 /**
  * @brief Read INI integer (returns default on parse failure)
  */
-int ReadIniInt(const char* section, const char* key, int defaultValue, 
-             const char* filePath);
+int ReadIniInt(const char* section, const char* key, int defaultValue,
+               const char* filePath);
 
 /**
  * @brief Read INI boolean (accepts TRUE/FALSE, 1/0, yes/no, case-insensitive)
  */
-BOOL ReadIniBool(const char* section, const char* key, BOOL defaultValue, 
-               const char* filePath);
+BOOL ReadIniBool(const char* section, const char* key, BOOL defaultValue,
+                 const char* filePath);
 
 /**
  * @brief Write INI integer (NOT atomic)
  */
 BOOL WriteIniInt(const char* section, const char* key, int value,
-               const char* filePath);
+                 const char* filePath);
 
 /**
  * @brief Key-value pair for batch INI updates
@@ -700,28 +720,30 @@ typedef struct {
 
 /**
  * @brief Batch write multiple INI values atomically
- * 
+ *
  * @param filePath INI file path
  * @param updates Array of key-value pairs to update
  * @param count Number of updates
  * @return TRUE on success, FALSE on failure
- * 
+ *
  * @details
  * Single atomic operation for multiple key-value pairs.
  * Uses temp file + atomic rename. Mutex-protected.
  * Performance: ~300x faster than individual writes during drag operations.
  */
-BOOL WriteIniMultipleAtomic(const char* filePath, const IniKeyValue* updates, size_t count);
+BOOL WriteIniMultipleAtomic(const char* filePath, const IniKeyValue* updates,
+                            size_t count);
 
 /* ============================================================================
  * First-run and font license tracking
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check first run status
  * @return TRUE if config missing or FIRST_RUN=TRUE
  */
-BOOL IsFirstRun(void);
+bool IsFirstRun(void);
 
 /**
  * @brief Mark first run complete
@@ -754,7 +776,8 @@ const char* GetCurrentFontLicenseVersion(void);
 
 /* ============================================================================
  * Time display and timer configuration
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Convert string to TimeFormatType enum
@@ -785,7 +808,7 @@ void WriteConfigTimeFormat(TimeFormatType format);
 /**
  * @brief Write centiseconds display setting (affects timer interval)
  * @param showMilliseconds TRUE for 10ms updates, FALSE for 1s
- * 
+ *
  * @details Changes timer frequency for performance (10ms vs 1000ms)
  */
 void WriteConfigShowMilliseconds(BOOL showMilliseconds);
@@ -793,7 +816,7 @@ void WriteConfigShowMilliseconds(BOOL showMilliseconds);
 /**
  * @brief Get timer interval based on centiseconds setting
  * @return 10ms if showing centiseconds, 1000ms otherwise
- * 
+ *
  * @details Performance optimization: only update 100x/sec when needed
  */
 UINT GetTimerInterval(void);
@@ -875,7 +898,8 @@ void ShutdownIniCache(void);
 
 /* ============================================================================
  * Tray icon animation color configuration
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Read percent icon colors (hex or RGB, defaults: black/white)
@@ -885,7 +909,7 @@ void ReadPercentIconColorsConfig(void);
 /**
  * @brief Get percent icon text color
  * @return Foreground COLORREF
- * 
+ *
  * @note Call ReadPercentIconColorsConfig() first
  */
 COLORREF GetPercentIconTextColor(void);
@@ -893,7 +917,7 @@ COLORREF GetPercentIconTextColor(void);
 /**
  * @brief Get percent icon background color
  * @return Background COLORREF
- * 
+ *
  * @note Call ReadPercentIconColorsConfig() first
  */
 COLORREF GetPercentIconBgColor(void);
