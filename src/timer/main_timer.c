@@ -8,8 +8,8 @@
 
 #include "timer/main_timer.h"
 #include "../../resource/resource.h"
-#include "utils/natural_sort.h"
 #include <mmsystem.h>
+#include <stdint.h>
 
 #ifdef _MSC_VER
 #pragma comment(lib, "winmm.lib")
@@ -18,17 +18,17 @@
 /* Timer state */
 static MMRESULT g_mainTimerId = 0;
 static HWND g_mainHwnd = nullptr;
-static UINT g_timerInterval = 20;
+static uint32_t g_timerInterval = 20;
 static bool g_highPrecisionActive = false;
-static UINT g_timerResolutionMs = 0;
+static uint32_t g_timerResolutionMs = 0;
 static volatile LONG g_tickMessagePending = 0;
 
 /**
  * @brief Multimedia timer callback (worker thread)
  * Posts message to main thread for rendering
  */
-static void CALLBACK MainTimerCallback([[maybe_unused]] UINT uTimerID,
-                                       [[maybe_unused]] UINT uMsg,
+static void CALLBACK MainTimerCallback([[maybe_unused]] uint32_t uTimerID,
+                                       [[maybe_unused]] uint32_t uMsg,
                                        [[maybe_unused]] DWORD_PTR dwUser,
                                        [[maybe_unused]] DWORD_PTR dw1,
                                        [[maybe_unused]] DWORD_PTR dw2) {
@@ -45,7 +45,7 @@ static void CALLBACK MainTimerCallback([[maybe_unused]] UINT uTimerID,
     InterlockedExchange(&g_tickMessagePending, 0);
 }
 
-static UINT NormalizeInterval(UINT intervalMs) {
+static uint32_t NormalizeInterval(uint32_t intervalMs) {
     return intervalMs > 0 ? intervalMs : 20;
 }
 
@@ -62,7 +62,7 @@ static bool StartMultimediaTimer(void) {
     return g_mainTimerId != 0;
 }
 
-bool MainTimer_Init(HWND hwnd, UINT intervalMs) {
+bool MainTimer_Init(HWND hwnd, uint32_t intervalMs) {
     if (!hwnd)
         return false;
 
@@ -99,7 +99,7 @@ bool MainTimer_Init(HWND hwnd, UINT intervalMs) {
     return true;
 }
 
-bool MainTimer_Start(HWND hwnd, UINT intervalMs) {
+bool MainTimer_Start(HWND hwnd, uint32_t intervalMs) {
     if (!hwnd)
         return false;
 
@@ -107,7 +107,7 @@ bool MainTimer_Start(HWND hwnd, UINT intervalMs) {
         return MainTimer_Init(hwnd, intervalMs);
     }
 
-    const UINT normalized = NormalizeInterval(intervalMs);
+    const uint32_t normalized = NormalizeInterval(intervalMs);
 
     if (!g_highPrecisionActive) {
         g_timerInterval = normalized;
@@ -148,8 +148,8 @@ void MainTimer_NotifyTickHandled(void) {
     InterlockedExchange(&g_tickMessagePending, 0);
 }
 
-void MainTimer_SetInterval(UINT intervalMs) {
-    UINT normalized = NormalizeInterval(intervalMs);
+void MainTimer_SetInterval(uint32_t intervalMs) {
+    uint32_t normalized = NormalizeInterval(intervalMs);
     if (normalized == g_timerInterval) {
         if (g_mainHwnd) {
             MainTimer_Start(g_mainHwnd, g_timerInterval);

@@ -64,10 +64,10 @@ BOOL GetFontsFolderW(wchar_t* outW, size_t size, BOOL ensureCreate) {
  * ============================================================================
  */
 
-BOOL BuildFontConfigPath(const char* relativePath, char* outBuffer,
+bool BuildFontConfigPath(const char* relativePath, char* outBuffer,
                          size_t bufferSize) {
     if (!relativePath || !outBuffer || bufferSize == 0)
-        return FALSE;
+        return false;
 
     int result = snprintf(outBuffer, bufferSize, "%s%s", FONT_FOLDER_PREFIX,
                           relativePath);

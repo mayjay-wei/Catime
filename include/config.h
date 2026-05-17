@@ -688,7 +688,7 @@ DWORD ReadIniString(const char* section, const char* key,
  * @brief Write INI string with UTF-8 support (NOT atomic)
  * @return TRUE on success
  */
-BOOL WriteIniString(const char* section, const char* key, const char* value,
+bool WriteIniString(const char* section, const char* key, const char* value,
                     const char* filePath);
 
 /**

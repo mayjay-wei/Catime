@@ -73,7 +73,7 @@ BOOL BuildFullFontPath(const char* relativePath, char* outAbsolutePath,
  *
  * @example "font.ttf" → "%LOCALAPPDATA%\...\fonts\font.ttf"
  */
-BOOL BuildFontConfigPath(const char* relativePath, char* outBuffer,
+bool BuildFontConfigPath(const char* relativePath, char* outBuffer,
                          size_t bufferSize);
 
 /**
