@@ -1,10 +1,11 @@
 /**
  * @file audio_player.c
  * @brief Three-tier audio fallback (miniaudio → PlaySound → beep)
- * 
- * Why three tiers: Unicode paths fail miniaudio, WAV-only fails PlaySound, beep never fails.
- * Path encoding: UTF-8 → short path (8.3) → ANSI for miniaudio compatibility.
- * Completion: miniaudio polls 500ms, PlaySound 3s timeout (no API), beep 500ms fixed.
+ *
+ * Why three tiers: Unicode paths fail miniaudio, WAV-only fails PlaySound, beep
+ * never fails. Path encoding: UTF-8 → short path (8.3) → ANSI for miniaudio
+ * compatibility. Completion: miniaudio polls 500ms, PlaySound 3s timeout (no
+ * API), beep 500ms fixed.
  */
 #include <windows.h>
 #include <stdio.h>
@@ -14,13 +15,15 @@
 #include "log.h"
 
 /* Audio polling intervals:
- * - 500ms for miniaudio: Frequent checks detect completion quickly while minimizing overhead
- * - 3000ms for PlaySound: API lacks completion callback, timeout based on typical notification length
+ * - 500ms for miniaudio: Frequent checks detect completion quickly while
+ * minimizing overhead
+ * - 3000ms for PlaySound: API lacks completion callback, timeout based on
+ * typical notification length
  * - 500ms for beep: Fixed duration matching typical system beep length
  */
-#define TIMER_INTERVAL_AUDIO_CHECK 500
-#define TIMER_INTERVAL_FALLBACK    3000
-#define TIMER_INTERVAL_BEEP        500
+constexpr UINT TIMER_INTERVAL_AUDIO_CHECK = 500;
+constexpr UINT TIMER_INTERVAL_FALLBACK = 3000;
+constexpr UINT TIMER_INTERVAL_BEEP = 500;
 
 typedef void (*AudioPlaybackCompleteCallback)(HWND hwnd);
 
@@ -31,12 +34,13 @@ static ma_bool32 g_soundInitialized = MA_FALSE;
 
 static ma_bool32 g_isPlaying = MA_FALSE;
 static ma_bool32 g_isPaused = MA_FALSE;
-static AudioPlaybackCompleteCallback g_audioCompleteCallback = NULL;
-static HWND g_audioCallbackHwnd = NULL;
+static AudioPlaybackCompleteCallback g_audioCompleteCallback = nullptr;
+static HWND g_audioCallbackHwnd = nullptr;
 static UINT_PTR g_audioTimerId = 0;
 static wchar_t g_tempAudioFile[MAX_PATH] = {0};
 
-static void CALLBACK AudioTimerCallback(HWND hwnd, UINT message, UINT_PTR idEvent, DWORD dwTime);
+static void CALLBACK AudioTimerCallback(HWND hwnd, UINT message,
+                                        UINT_PTR idEvent, DWORD dwTime);
 static BOOL FallbackToPlaySound(HWND hwnd, const wchar_t* wFilePath);
 static BOOL FallbackToSystemBeep(HWND hwnd);
 static void ResetPlaybackState(void);
@@ -44,11 +48,13 @@ static void StartPlaybackTimer(HWND hwnd, UINT timerId, UINT interval);
 
 /* ============================================================================
  * Utility functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** GetFileAttributes cheaper than CreateFile, rejects directories */
 static BOOL AudioFileExists(const char* filePath) {
-    if (!filePath || filePath[0] == '\0') return FALSE;
+    if (!filePath || filePath[0] == '\0')
+        return false;
 
     wchar_t wFilePath[MAX_PATH * 2] = {0};
     MultiByteToWideChar(CP_UTF8, 0, filePath, -1, wFilePath, MAX_PATH * 2);
@@ -60,17 +66,20 @@ static BOOL AudioFileExists(const char* filePath) {
 
 /** Basic validation (prevents misconfig crashes, not full security) */
 static BOOL IsValidFilePath(const char* filePath) {
-    if (!filePath || filePath[0] == '\0') return FALSE;
-    if (strchr(filePath, '=') != NULL) return FALSE;
-    if (strlen(filePath) >= MAX_PATH) return FALSE;
-    return TRUE;
+    if (!filePath || filePath[0] == '\0')
+        return false;
+    if (strchr(filePath, '=') != nullptr)
+        return false;
+    if (strlen(filePath) >= MAX_PATH)
+        return false;
+    return true;
 }
 
 static void ResetPlaybackState(void) {
     g_isPlaying = MA_FALSE;
     g_isPaused = MA_FALSE;
     g_audioTimerId = 0;
-    
+
     /* Clean up temporary audio file if exists */
     if (g_tempAudioFile[0] != L'\0') {
         DeleteFileW(g_tempAudioFile);
@@ -83,22 +92,24 @@ static void StartPlaybackTimer(HWND hwnd, UINT timerId, UINT interval) {
     if (g_audioTimerId != 0) {
         KillTimer(hwnd, g_audioTimerId);
     }
-    g_audioTimerId = SetTimer(hwnd, timerId, interval, (TIMERPROC)AudioTimerCallback);
+    g_audioTimerId =
+        SetTimer(hwnd, timerId, interval, (TIMERPROC)AudioTimerCallback);
 }
 
 /* ============================================================================
  * Fallback mechanisms
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** Tier 2: PlaySound (WAV only) */
 static BOOL FallbackToPlaySound(HWND hwnd, const wchar_t* wFilePath) {
-    if (!PlaySoundW(wFilePath, NULL, SND_FILENAME | SND_ASYNC)) {
-        return FALSE;
+    if (!PlaySoundW(wFilePath, nullptr, SND_FILENAME | SND_ASYNC)) {
+        return false;
     }
-    
+
     StartPlaybackTimer(hwnd, TIMER_ID_PLAYSOUND_DONE, TIMER_INTERVAL_FALLBACK);
     g_isPlaying = MA_TRUE;
-    return TRUE;
+    return true;
 }
 
 /** Tier 3: System beep (never fails) */
@@ -106,137 +117,155 @@ static BOOL FallbackToSystemBeep(HWND hwnd) {
     MessageBeep(MB_OK);
     StartPlaybackTimer(hwnd, TIMER_ID_SYSTEM_BEEP_DONE, TIMER_INTERVAL_BEEP);
     g_isPlaying = MA_TRUE;
-    return TRUE;
+    return true;
 }
 
 /* ============================================================================
  * Audio engine management
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static BOOL InitializeAudioEngine(void) {
     if (g_engineInitialized) {
-        return TRUE;
+        return true;
     }
 
-    ma_result result = ma_engine_init(NULL, &g_audioEngine);
+    ma_result result = ma_engine_init(nullptr, &g_audioEngine);
     if (result != MA_SUCCESS) {
-        return FALSE;
+        return false;
     }
 
     g_engineInitialized = MA_TRUE;
-    return TRUE;
+    return true;
 }
-
 
 /* ============================================================================
  * Path conversion utilities
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * Create temporary copy of audio file with ASCII-safe filename
  * Used when original filename contains non-ASCII characters (e.g., Cyrillic)
- * Returns TRUE if temp file created successfully
+ * Returns true if temp file created successfully
  */
-static BOOL CreateTempAudioCopy(const wchar_t* originalPath, wchar_t* tempPath, size_t tempPathSize) {
+static BOOL CreateTempAudioCopy(const wchar_t* originalPath, wchar_t* tempPath,
+                                size_t tempPathSize) {
     /* Get temp directory */
     wchar_t tempDir[MAX_PATH];
     if (GetTempPathW(MAX_PATH, tempDir) == 0) {
-        return FALSE;
+        return false;
     }
-    
+
     /* Extract file extension from original path */
     const wchar_t* ext = wcsrchr(originalPath, L'.');
-    if (!ext) ext = L"";
-    
+    if (!ext)
+        ext = L"";
+
     /* Generate unique temp filename using timestamp */
     SYSTEMTIME st;
     GetLocalTime(&st);
-    _snwprintf_s(tempPath, tempPathSize, _TRUNCATE, L"%scatime_audio_%04d%02d%02d_%02d%02d%02d_%03d%s",
-                tempDir, st.wYear, st.wMonth, st.wDay, 
-                st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, ext);
-    
+    _snwprintf_s(tempPath, tempPathSize, _TRUNCATE,
+                 L"%scatime_audio_%04d%02d%02d_%02d%02d%02d_%03d%s", tempDir,
+                 st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
+                 st.wMilliseconds, ext);
+
     /* Copy file to temp location */
-    if (!CopyFileW(originalPath, tempPath, FALSE)) {
-        return FALSE;
+    if (!CopyFileW(originalPath, tempPath, false)) {
+        return false;
     }
-    
+
     /* Store temp file path for cleanup */
     wcsncpy(g_tempAudioFile, tempPath, MAX_PATH - 1);
     g_tempAudioFile[MAX_PATH - 1] = L'\0';
-    
-    return TRUE;
+
+    return true;
 }
 
-/** UTF-8 → short path (8.3) → ANSI for miniaudio, or create temp copy for non-ASCII names */
-static BOOL ConvertPathForMiniaudio(const char* utf8Path, char* outPath, size_t outPathSize) {
+/** UTF-8 → short path (8.3) → ANSI for miniaudio, or create temp copy for
+ * non-ASCII names */
+static BOOL ConvertPathForMiniaudio(const char* utf8Path, char* outPath,
+                                    size_t outPathSize) {
     wchar_t wFilePath[MAX_PATH * 2] = {0};
-    
+
     /* UTF-8 to Unicode */
-    if (MultiByteToWideChar(CP_UTF8, 0, utf8Path, -1, wFilePath, MAX_PATH * 2) == 0) {
-        return FALSE;
+    if (MultiByteToWideChar(CP_UTF8, 0, utf8Path, -1, wFilePath,
+                            MAX_PATH * 2) == 0) {
+        return false;
     }
-    
+
     /* Try short path for ASCII compatibility */
     wchar_t shortPath[MAX_PATH] = {0};
     DWORD shortPathLen = GetShortPathNameW(wFilePath, shortPath, MAX_PATH);
-    
-    if (shortPathLen > 0 && shortPathLen < MAX_PATH) {
-        /* Convert short path to ANSI - only if conversion succeeds without data loss */
-        BOOL usedDefaultChar = FALSE;
-        int result = WideCharToMultiByte(CP_ACP, 0, shortPath, -1, outPath, (int)outPathSize, NULL, &usedDefaultChar);
-        
+
+    if (shortPathLen < MAX_PATH) {
+        /* Convert short path to ANSI - only if conversion succeeds without data
+         * loss */
+        BOOL usedDefaultChar = false;
+        int result =
+            WideCharToMultiByte(CP_ACP, 0, shortPath, -1, outPath,
+                                (int)outPathSize, nullptr, &usedDefaultChar);
+
         if (result > 0 && !usedDefaultChar) {
-            return TRUE;
+            return true;
         }
     }
-    
-    /* 
+
+    /*
      * Path contains non-ASCII characters that can't be converted safely.
-     * Create a temporary copy with ASCII-safe filename to enable miniaudio playback.
-     * This preserves the original file and allows playback of files with Cyrillic,
-     * Chinese, or other non-ASCII names on any Windows system.
+     * Create a temporary copy with ASCII-safe filename to enable miniaudio
+     * playback. This preserves the original file and allows playback of files
+     * with Cyrillic, Chinese, or other non-ASCII names on any Windows system.
      */
     wchar_t tempPath[MAX_PATH];
     if (CreateTempAudioCopy(wFilePath, tempPath, MAX_PATH)) {
-        /* Try to convert temp path (should always succeed since we use ASCII filename) */
+        /* Try to convert temp path (should always succeed since we use ASCII
+         * filename) */
         DWORD tempShortLen = GetShortPathNameW(tempPath, shortPath, MAX_PATH);
-        if (tempShortLen > 0 && tempShortLen < MAX_PATH) {
-            BOOL usedDefaultChar = FALSE;
-            int result = WideCharToMultiByte(CP_ACP, 0, shortPath, -1, outPath, (int)outPathSize, NULL, &usedDefaultChar);
+        if (tempShortLen < MAX_PATH) {
+            BOOL usedDefaultChar = false;
+            int result = WideCharToMultiByte(CP_ACP, 0, shortPath, -1, outPath,
+                                             (int)outPathSize, nullptr,
+                                             &usedDefaultChar);
             if (result > 0 && !usedDefaultChar) {
-                return TRUE;
+                return true;
             }
         }
-        
+
         /* If even temp path fails (shouldn't happen), try direct conversion */
-        if (WideCharToMultiByte(CP_ACP, 0, tempPath, -1, outPath, (int)outPathSize, NULL, NULL) > 0) {
-            return TRUE;
+        if (WideCharToMultiByte(CP_ACP, 0, tempPath, -1, outPath,
+                                (int)outPathSize, nullptr, nullptr) > 0) {
+            return true;
         }
-        
+
         /* Cleanup temp file if we can't use it */
         DeleteFileW(tempPath);
         g_tempAudioFile[0] = L'\0';
     }
-    
+
     /* All attempts failed - fallback to PlaySound */
-    return FALSE;
+    return false;
 }
 
-static BOOL GetWideCharPath(const char* utf8Path, wchar_t* wPath, size_t wPathSize) {
-    return MultiByteToWideChar(CP_UTF8, 0, utf8Path, -1, wPath, (int)wPathSize) > 0;
+static BOOL GetWideCharPath(const char* utf8Path, wchar_t* wPath,
+                            size_t wPathSize) {
+    return MultiByteToWideChar(CP_UTF8, 0, utf8Path, -1, wPath,
+                               (int)wPathSize) > 0;
 }
 
 /* ============================================================================
  * Audio playback core
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static ma_result LoadAudioFile(const char* convertedPath) {
     if (g_soundInitialized) {
         ma_sound_uninit(&g_sound);
         g_soundInitialized = MA_FALSE;
     }
-    
-    ma_result result = ma_sound_init_from_file(&g_audioEngine, convertedPath, 0, NULL, NULL, &g_sound);
+
+    ma_result result = ma_sound_init_from_file(&g_audioEngine, convertedPath, 0,
+                                               nullptr, nullptr, &g_sound);
     if (result == MA_SUCCESS) {
         g_soundInitialized = MA_TRUE;
     }
@@ -247,7 +276,7 @@ static ma_result StartAudioPlayback(void) {
     if (!g_soundInitialized) {
         return MA_ERROR;
     }
-    
+
     ma_result result = ma_sound_start(&g_sound);
     if (result != MA_SUCCESS) {
         ma_sound_uninit(&g_sound);
@@ -258,112 +287,131 @@ static ma_result StartAudioPlayback(void) {
 
 /** Tier 1: miniaudio with automatic fallback */
 static BOOL PlayAudioWithMiniaudio(HWND hwnd, const char* filePath) {
-    if (!filePath || filePath[0] == '\0') return FALSE;
-    
+    if (!filePath || filePath[0] == '\0')
+        return false;
+
     LOG_INFO("Attempting to play audio file: %s", filePath);
-    
+
     if (!g_engineInitialized && !InitializeAudioEngine()) {
-        LOG_WARNING("Failed to initialize miniaudio engine, will try fallback methods");
-        return FALSE;
+        LOG_WARNING(
+            "Failed to initialize miniaudio engine, will try fallback methods");
+        return false;
     }
-    
+
     float volume = (float)g_AppConfig.notification.sound.volume / 100.0f;
     ma_engine_set_volume(&g_audioEngine, volume);
-    
+
     wchar_t wFilePath[MAX_PATH * 2] = {0};
     if (!GetWideCharPath(filePath, wFilePath, MAX_PATH * 2)) {
-        return FALSE;
+        return false;
     }
-    
+
     char convertedPath[MAX_PATH * 4] = {0};
-    if (!ConvertPathForMiniaudio(filePath, convertedPath, sizeof(convertedPath))) {
+    if (!ConvertPathForMiniaudio(filePath, convertedPath,
+                                 sizeof(convertedPath))) {
         return FallbackToPlaySound(hwnd, wFilePath);
     }
-    
+
     ma_result result = LoadAudioFile(convertedPath);
     if (result != MA_SUCCESS) {
-        LOG_WARNING("miniaudio failed to load audio file (error: %d), falling back to PlaySound", result);
+        LOG_WARNING(
+            "miniaudio failed to load audio file (error: %d), falling back to "
+            "PlaySound",
+            result);
         return FallbackToPlaySound(hwnd, wFilePath);
     }
-    
+
     if (StartAudioPlayback() != MA_SUCCESS) {
-        LOG_WARNING("miniaudio playback start failed, falling back to PlaySound");
+        LOG_WARNING(
+            "miniaudio playback start failed, falling back to PlaySound");
         return FallbackToPlaySound(hwnd, wFilePath);
     }
-    
+
     LOG_INFO("Audio playback started successfully using miniaudio engine");
     g_isPlaying = MA_TRUE;
-    StartPlaybackTimer(hwnd, TIMER_ID_MINIAUDIO_CHECK, TIMER_INTERVAL_AUDIO_CHECK);
-    return TRUE;
+    StartPlaybackTimer(hwnd, TIMER_ID_MINIAUDIO_CHECK,
+                       TIMER_INTERVAL_AUDIO_CHECK);
+    return true;
 }
 
 /* ============================================================================
  * Timer callbacks
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** Unified completion detector (polls miniaudio, timeouts for others) */
-static void CALLBACK AudioTimerCallback(HWND hwnd, UINT message, UINT_PTR idEvent, DWORD dwTime) {
+static void CALLBACK AudioTimerCallback(HWND hwnd, UINT message,
+                                        UINT_PTR idEvent, DWORD dwTime) {
     (void)message;
     (void)dwTime;
-    
-    BOOL shouldStop = FALSE;
-    
+
+    BOOL shouldStop = false;
+
     switch (idEvent) {
-        case TIMER_ID_MINIAUDIO_CHECK:
-            if (g_engineInitialized && g_soundInitialized) {
-                if (!ma_sound_is_playing(&g_sound) && !g_isPaused) {
-                    if (g_soundInitialized) {
-                        ma_sound_uninit(&g_sound);
-                        g_soundInitialized = MA_FALSE;
-                    }
-                    shouldStop = TRUE;
-                }
-            } else {
-                shouldStop = TRUE;
+        case TIMER_ID_MINIAUDIO_CHECK: {
+            if (!g_engineInitialized || !g_soundInitialized) {
+                shouldStop = true;
+
+                break;
             }
+            if (ma_sound_is_playing(&g_sound) || g_isPaused) {
+                break;
+            }
+            if (g_soundInitialized) {
+                ma_sound_uninit(&g_sound);
+                g_soundInitialized = MA_FALSE;
+            }
+            shouldStop = true;
             break;
-            
+        }
+
         case TIMER_ID_PLAYSOUND_DONE:
         case TIMER_ID_SYSTEM_BEEP_DONE:
-            shouldStop = TRUE;
+            shouldStop = true;
             break;
     }
-    
-    if (shouldStop) {
-        KillTimer(hwnd, idEvent);
-        ResetPlaybackState();
-        
-        if (g_audioCompleteCallback) {
-            g_audioCompleteCallback(g_audioCallbackHwnd);
-        }
+
+    if (!shouldStop) {
+        return;
+    }
+    KillTimer(hwnd, idEvent);
+    ResetPlaybackState();
+
+    if (g_audioCompleteCallback) {
+        g_audioCompleteCallback(g_audioCallbackHwnd);
     }
 }
 
 /* ============================================================================
  * Public API
- * ============================================================================ */
+ * ============================================================================
+ */
 
 void SetAudioVolume(int volume) {
-    if (volume < 0) volume = 0;
-    if (volume > 100) volume = 100;
+    if (volume < 0)
+        volume = 0;
+    if (volume > 100)
+        volume = 100;
 
-    if (g_engineInitialized) {
-        float volFloat = (float)volume / 100.0f;
-        ma_engine_set_volume(&g_audioEngine, volFloat);
+    if (!g_engineInitialized) {
+        return;
+    }
+    float volFloat = (float)volume / 100.0f;
+    ma_engine_set_volume(&g_audioEngine, volFloat);
 
-        if (g_soundInitialized && g_isPlaying) {
-            ma_sound_set_volume(&g_sound, volFloat);
-        }
+    if (g_soundInitialized && g_isPlaying) {
+        ma_sound_set_volume(&g_sound, volFloat);
     }
 }
 
-void SetAudioPlaybackCompleteCallback(HWND hwnd, AudioPlaybackCompleteCallback callback) {
+void SetAudioPlaybackCompleteCallback(HWND hwnd,
+                                      AudioPlaybackCompleteCallback callback) {
     g_audioCallbackHwnd = hwnd;
     g_audioCompleteCallback = callback;
 }
 
 void CleanupAudioResources(void) {
-    PlaySoundW(NULL, NULL, SND_PURGE);
+    PlaySoundW(nullptr, nullptr, SND_PURGE);
 
     if (g_engineInitialized && g_soundInitialized) {
         ma_sound_stop(&g_sound);
@@ -371,7 +419,7 @@ void CleanupAudioResources(void) {
         g_soundInitialized = MA_FALSE;
     }
 
-    if (g_audioTimerId != 0 && g_audioCallbackHwnd != NULL) {
+    if (g_audioTimerId != 0 && g_audioCallbackHwnd != nullptr) {
         KillTimer(g_audioCallbackHwnd, g_audioTimerId);
     }
 
@@ -384,7 +432,7 @@ BOOL PlayNotificationSound(HWND hwnd) {
 
     if (g_AppConfig.notification.sound.sound_file[0] == '\0') {
         LOG_INFO("No audio file configured, skipping sound playback");
-        return TRUE;
+        return true;
     }
 
     if (strcmp(g_AppConfig.notification.sound.sound_file, "SYSTEM_BEEP") == 0) {
@@ -393,43 +441,47 @@ BOOL PlayNotificationSound(HWND hwnd) {
     }
 
     if (!IsValidFilePath(g_AppConfig.notification.sound.sound_file)) {
-        LOG_WARNING("Invalid audio file path (will fallback to system beep): %s", 
-                   g_AppConfig.notification.sound.sound_file);
+        LOG_WARNING(
+            "Invalid audio file path (will fallback to system beep): %s",
+            g_AppConfig.notification.sound.sound_file);
         return FallbackToSystemBeep(hwnd);
     }
 
     if (!AudioFileExists(g_AppConfig.notification.sound.sound_file)) {
-        LOG_WARNING("Cannot find audio file (will fallback to system beep): %s", 
-                   g_AppConfig.notification.sound.sound_file);
+        LOG_WARNING("Cannot find audio file (will fallback to system beep): %s",
+                    g_AppConfig.notification.sound.sound_file);
         return FallbackToSystemBeep(hwnd);
     }
 
-    if (PlayAudioWithMiniaudio(hwnd, g_AppConfig.notification.sound.sound_file)) {
-        return TRUE;
+    if (PlayAudioWithMiniaudio(hwnd,
+                               g_AppConfig.notification.sound.sound_file)) {
+        return true;
     }
 
-    LOG_WARNING("All audio playback methods failed, using system beep as final fallback");
+    LOG_WARNING(
+        "All audio playback methods failed, using system beep as final "
+        "fallback");
     return FallbackToSystemBeep(hwnd);
 }
 
 BOOL PauseNotificationSound(void) {
-    if (g_isPlaying && !g_isPaused && g_engineInitialized && g_soundInitialized) {
+    if (g_isPlaying && !g_isPaused && g_engineInitialized &&
+        g_soundInitialized) {
         ma_sound_stop(&g_sound);
         g_isPaused = MA_TRUE;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 BOOL ResumeNotificationSound(void) {
-    if (g_isPlaying && g_isPaused && g_engineInitialized && g_soundInitialized) {
+    if (g_isPlaying && g_isPaused && g_engineInitialized &&
+        g_soundInitialized) {
         ma_sound_start(&g_sound);
         g_isPaused = MA_FALSE;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
-void StopNotificationSound(void) {
-    CleanupAudioResources();
-}
+void StopNotificationSound(void) { CleanupAudioResources(); }
