@@ -107,29 +107,28 @@ bool MainTimer_Start(HWND hwnd, UINT intervalMs) {
         return MainTimer_Init(hwnd, intervalMs);
     }
 
-    UINT normalized = NormalizeInterval(intervalMs);
+    const UINT normalized = NormalizeInterval(intervalMs);
 
-    if (g_highPrecisionActive) {
-        if (g_mainTimerId == 0) {
-            g_timerInterval = normalized;
-            if (!StartMultimediaTimer()) {
-                g_highPrecisionActive = false;
-                return StartSetTimerFallback();
-            }
-        } else if (normalized != g_timerInterval) {
-            g_timerInterval = normalized;
-            timeKillEvent(g_mainTimerId);
-            if (!StartMultimediaTimer()) {
-                g_highPrecisionActive = false;
-                return StartSetTimerFallback();
-            }
-        }
-        KillTimer(g_mainHwnd, TIMER_ID_MAIN);
-        return true;
+    if (!g_highPrecisionActive) {
+        g_timerInterval = normalized;
+        return StartSetTimerFallback();
     }
-
-    g_timerInterval = normalized;
-    return StartSetTimerFallback();
+    if (g_mainTimerId == 0) {
+        g_timerInterval = normalized;
+        if (!StartMultimediaTimer()) {
+            g_highPrecisionActive = false;
+            return StartSetTimerFallback();
+        }
+    } else if (normalized != g_timerInterval) {
+        g_timerInterval = normalized;
+        timeKillEvent(g_mainTimerId);
+        if (!StartMultimediaTimer()) {
+            g_highPrecisionActive = false;
+            return StartSetTimerFallback();
+        }
+    }
+    KillTimer(g_mainHwnd, TIMER_ID_MAIN);
+    return true;
 }
 
 void MainTimer_Stop(void) {
