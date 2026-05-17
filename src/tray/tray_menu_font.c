@@ -24,9 +24,9 @@
  * ============================================================================
  */
 
-#define MAX_FONT_ENTRIES 200
-#define MAX_RECURSION_DEPTH 10
-#define MAX_FONT_NAME_LENGTH 260
+constexpr uint32_t MAX_FONT_ENTRIES = 200;
+constexpr uint32_t MAX_RECURSION_DEPTH = 10;
+constexpr size_t MAX_FONT_NAME_LENGTH = 260;
 
 /* ============================================================================
  * External dependencies
@@ -35,7 +35,7 @@
 
 extern char FONT_FILE_NAME[MAX_PATH];
 extern void GetConfigPath(char* path, size_t size);
-extern BOOL NeedsFontLicenseVersionAcceptance(void);
+extern bool NeedsFontLicenseVersionAcceptance(void);
 extern bool ExtractEmbeddedFontsToFolder(HINSTANCE hInstance);
 
 /* ============================================================================
@@ -50,7 +50,7 @@ typedef struct {
     wchar_t fileName[MAX_FONT_NAME_LENGTH];
     wchar_t relativePath[MAX_PATH];
     wchar_t displayName[MAX_FONT_NAME_LENGTH];
-    BOOL isCurrentFont;
+    bool isCurrentFont;
 } FontEntry;
 
 /**
@@ -58,8 +58,8 @@ typedef struct {
  */
 typedef struct {
     FontEntry* entries;
-    int count;
-    int capacity;
+    int32_t count;
+    int32_t capacity;
     wchar_t currentFontRelPath[MAX_PATH];
 } FontScanContext;
 
@@ -72,7 +72,7 @@ typedef struct {
  * @brief Get fonts folder path
  */
 static BOOL GetFontsFolderPath(wchar_t* outPath, size_t size) {
-    return GetFontsFolderW(outPath, size, FALSE);
+    return GetFontsFolderW(outPath, size, false);
 }
 
 /**
@@ -85,14 +85,14 @@ static void GetCurrentFontRelativePath(wchar_t* outPath, size_t size) {
 
     const char* prefix = FONTS_PATH_PREFIX;
     size_t prefixLen = strlen(prefix);
-    const char* source = NULL;
+    const char* source = nullptr;
 
     if (_strnicmp(FONT_FILE_NAME, prefix, prefixLen) == 0) {
         /* Custom font - extract relative path */
         source = FONT_FILE_NAME + prefixLen;
-    } else if (strchr(FONT_FILE_NAME, ':') == NULL &&
-               (strchr(FONT_FILE_NAME, '\\') != NULL ||
-                strchr(FONT_FILE_NAME, '/') != NULL)) {
+    } else if (strchr(FONT_FILE_NAME, ':') == nullptr &&
+               (strchr(FONT_FILE_NAME, '\\') != nullptr ||
+                strchr(FONT_FILE_NAME, '/') != nullptr)) {
         /* Relative path without prefix */
         source = FONT_FILE_NAME;
     }
@@ -118,7 +118,7 @@ static BOOL AddFontEntry(FontScanContext* ctx, const wchar_t* fileName,
         WriteLog(LOG_LEVEL_WARNING,
                  "Font list capacity reached (%d), skipping: %ls",
                  ctx->capacity, fileName);
-        return FALSE;
+        return false;
     }
 
     FontEntry* entry = &ctx->entries[ctx->count];
@@ -140,7 +140,7 @@ static BOOL AddFontEntry(FontScanContext* ctx, const wchar_t* fileName,
         (_wcsicmp(relativePath, ctx->currentFontRelPath) == 0);
 
     ctx->count++;
-    return TRUE;
+    return true;
 }
 
 /* ============================================================================
@@ -154,7 +154,7 @@ static BOOL AddFontEntry(FontScanContext* ctx, const wchar_t* fileName,
 static void ScanFontFolderRecursive(const wchar_t* folderPath,
                                     const wchar_t* relativePath,
                                     FontScanContext* ctx, int depth) {
-    if (depth >= MAX_RECURSION_DEPTH) {
+    if ((uint32_t)depth >= MAX_RECURSION_DEPTH) {
         WriteLog(LOG_LEVEL_WARNING, "Max recursion depth reached at: %ls",
                  folderPath);
         return;
@@ -215,10 +215,8 @@ static void ScanFontFolderRecursive(const wchar_t* folderPath,
  */
 static int ScanFontsFolder(FontEntry* entries, int capacity,
                            const wchar_t* currentFontRelPath) {
-    FontScanContext ctx = {0};
-    ctx.entries = entries;
-    ctx.count = 0;
-    ctx.capacity = capacity;
+    FontScanContext ctx = {
+        .entries = entries, .count = 0, .capacity = capacity};
     wcsncpy(ctx.currentFontRelPath, currentFontRelPath, MAX_PATH - 1);
     ctx.currentFontRelPath[MAX_PATH - 1] = L'\0';
 
@@ -261,29 +259,31 @@ static int CompareFontEntries(const void* a, const void* b) {
  */
 static HMENU EnsureSubMenu(HMENU hParent, const wchar_t* name,
                            BOOL shouldCheck) {
-    int count = GetMenuItemCount(hParent);
-    MENUITEMINFOW mii = {0};
-    mii.cbSize = sizeof(mii);
-    mii.fMask = MIIM_STRING | MIIM_SUBMENU | MIIM_STATE;
+    MENUITEMINFOW mii = {.cbSize = sizeof(mii),
+                         .fMask = MIIM_STRING | MIIM_SUBMENU | MIIM_STATE};
     wchar_t buffer[MAX_PATH] = {0};
 
+    int count = GetMenuItemCount(hParent);
     for (int i = 0; i < count; i++) {
         mii.dwTypeData = buffer;
         mii.cch = MAX_PATH;
-        if (GetMenuItemInfoW(hParent, i, TRUE, &mii)) {
-            if (mii.hSubMenu && wcscmp(buffer, name) == 0) {
-                if (shouldCheck && !(mii.fState & MFS_CHECKED)) {
-                    mii.fState |= MFS_CHECKED;
-                    SetMenuItemInfoW(hParent, i, TRUE, &mii);
-                }
-                return mii.hSubMenu;
-            }
+        if (!GetMenuItemInfoW(hParent, i, true, &mii)) {
+            continue;
         }
+
+        if (!mii.hSubMenu || wcscmp(buffer, name) != 0) {
+            continue;
+        }
+        if (shouldCheck && !(mii.fState & MFS_CHECKED)) {
+            mii.fState |= MFS_CHECKED;
+            SetMenuItemInfoW(hParent, i, true, &mii);
+        }
+        return mii.hSubMenu;
     }
 
     HMENU hSub = CreatePopupMenu();
     if (!hSub)
-        return NULL;
+        return nullptr;
 
     UINT flags = MF_POPUP;
     if (shouldCheck)
@@ -314,43 +314,45 @@ static void BuildFontMenuFromEntries(HMENU hRootMenu, FontEntry* entries,
     int parentDirCount = 0;
 
     for (int i = 0; i < count; i++) {
-        if (sortedEntries[i]->isCurrentFont) {
-            wchar_t pathCopy[MAX_PATH];
-            wcsncpy(pathCopy, sortedEntries[i]->relativePath, MAX_PATH - 1);
-            pathCopy[MAX_PATH - 1] = L'\0';
+        if (!sortedEntries[i]->isCurrentFont) {
+            continue;
+        }
+        wchar_t pathCopy[MAX_PATH];
+        wcsncpy(pathCopy, sortedEntries[i]->relativePath, MAX_PATH - 1);
+        pathCopy[MAX_PATH - 1] = L'\0';
 
-            wchar_t currentPath[MAX_PATH] = L"";
-            wchar_t* context = NULL;
-            wchar_t* token = wcstok_s(pathCopy, L"\\/", &context);
+        wchar_t currentPath[MAX_PATH] = L"";
+        wchar_t* context = nullptr;
+        wchar_t* token = wcstok_s(pathCopy, L"\\/", &context);
 
-            while (token) {
-                wchar_t* nextToken = wcstok_s(NULL, L"\\/", &context);
-                if (nextToken) {
-                    size_t currentLen = wcslen(currentPath);
-                    size_t tokenLen = wcslen(token);
-
-                    if (currentLen + tokenLen + 2 < MAX_PATH) {
-                        if (currentLen > 0)
-                            wcsncat_s(currentPath, MAX_PATH, L"\\", 1);
-                        wcsncat_s(currentPath, MAX_PATH, token, tokenLen);
-                    }
-
-                    BOOL found = FALSE;
-                    for (int j = 0; j < parentDirCount; j++) {
-                        if (wcscmp(parentDirs[j], currentPath) == 0) {
-                            found = TRUE;
-                            break;
-                        }
-                    }
-                    if (!found && parentDirCount < MAX_PARENT_DIRS) {
-                        wcsncpy(parentDirs[parentDirCount], currentPath,
-                                MAX_PATH - 1);
-                        parentDirs[parentDirCount][MAX_PATH - 1] = L'\0';
-                        parentDirCount++;
-                    }
-                }
+        while (token) {
+            wchar_t* nextToken = wcstok_s(nullptr, L"\\/", &context);
+            if (!nextToken) {
                 token = nextToken;
+                continue;
             }
+            size_t currentLen = wcslen(currentPath);
+            size_t tokenLen = wcslen(token);
+
+            if (currentLen + tokenLen + 2 < MAX_PATH) {
+                if (currentLen > 0)
+                    wcsncat_s(currentPath, MAX_PATH, L"\\", 1);
+                wcsncat_s(currentPath, MAX_PATH, token, tokenLen);
+            }
+
+            bool found = false;
+            for (int j = 0; j < parentDirCount; j++) {
+                if (wcscmp(parentDirs[j], currentPath) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && parentDirCount < MAX_PARENT_DIRS) {
+                wcsncpy(parentDirs[parentDirCount], currentPath, MAX_PATH - 1);
+                parentDirs[parentDirCount][MAX_PATH - 1] = L'\0';
+                parentDirCount++;
+            }
+            token = nextToken;
         }
     }
 
@@ -362,14 +364,14 @@ static void BuildFontMenuFromEntries(HMENU hRootMenu, FontEntry* entries,
         wcsncpy(pathCopy, entry->relativePath, MAX_PATH - 1);
         pathCopy[MAX_PATH - 1] = L'\0';
 
-        wchar_t* context = NULL;
+        wchar_t* context = nullptr;
         wchar_t* token = wcstok_s(pathCopy, L"\\/", &context);
 
         HMENU hCurrent = hRootMenu;
         wchar_t currentPath[MAX_PATH] = L"";
 
         while (token) {
-            wchar_t* nextToken = wcstok_s(NULL, L"\\/", &context);
+            wchar_t* nextToken = wcstok_s(nullptr, L"\\/", &context);
 
             if (nextToken) {
                 size_t currentLen = wcslen(currentPath);
@@ -381,10 +383,10 @@ static void BuildFontMenuFromEntries(HMENU hRootMenu, FontEntry* entries,
                     wcsncat_s(currentPath, MAX_PATH, token, tokenLen);
                 }
 
-                BOOL shouldCheck = FALSE;
+                BOOL shouldCheck = false;
                 for (int j = 0; j < parentDirCount; j++) {
                     if (wcscmp(parentDirs[j], currentPath) == 0) {
-                        shouldCheck = TRUE;
+                        shouldCheck = true;
                         break;
                     }
                 }
@@ -424,9 +426,9 @@ void BuildFontSubmenu(HMENU hMenu) {
     int g_advancedFontId = CMD_FONT_SELECTION_BASE;
 
     if (NeedsFontLicenseVersionAcceptance()) {
-        AppendMenuW(
-            hFontSubMenu, MF_STRING, CLOCK_IDC_FONT_LICENSE_AGREE,
-            GetLocalizedString(NULL, L"Click to agree to license agreement"));
+        AppendMenuW(hFontSubMenu, MF_STRING, CLOCK_IDC_FONT_LICENSE_AGREE,
+                    GetLocalizedString(nullptr,
+                                       L"Click to agree to license agreement"));
     } else {
         /* Get current font relative path */
         wchar_t currentFontRelPath[MAX_PATH] = L"";
@@ -443,29 +445,30 @@ void BuildFontSubmenu(HMENU hMenu) {
                 ScanFontsFolder(entries, MAX_FONT_ENTRIES, currentFontRelPath);
 
             if (fontCount == 0) {
-                AppendMenuW(hFontSubMenu, MF_STRING | MF_GRAYED, 0,
-                            GetLocalizedString(NULL, L"No font files found"));
-                AppendMenuW(hFontSubMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(
+                    hFontSubMenu, MF_STRING | MF_GRAYED, 0,
+                    GetLocalizedString(nullptr, L"No font files found"));
+                AppendMenuW(hFontSubMenu, MF_SEPARATOR, 0, nullptr);
             } else {
                 BuildFontMenuFromEntries(hFontSubMenu, entries, fontCount,
                                          &g_advancedFontId);
-                AppendMenuW(hFontSubMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hFontSubMenu, MF_SEPARATOR, 0, nullptr);
             }
 
             /* Determine if current font is a system font */
-            BOOL isSystemFont = TRUE;
+            BOOL isSystemFont = true;
             const char* prefix = FONTS_PATH_PREFIX;
             size_t prefixLen = strlen(prefix);
 
             if (_strnicmp(FONT_FILE_NAME, prefix, prefixLen) == 0) {
-                isSystemFont = FALSE;
-            } else if (strchr(FONT_FILE_NAME, ':') != NULL) {
+                isSystemFont = false;
+            } else if (strchr(FONT_FILE_NAME, ':') != nullptr) {
                 isSystemFont =
-                    (strstr(FONT_FILE_NAME, "Windows\\Fonts") != NULL ||
-                     strstr(FONT_FILE_NAME, "WINDOWS\\Fonts") != NULL);
-            } else if (strchr(FONT_FILE_NAME, '\\') != NULL ||
-                       strchr(FONT_FILE_NAME, '/') != NULL) {
-                isSystemFont = FALSE;
+                    (strstr(FONT_FILE_NAME, "Windows\\Fonts") != nullptr ||
+                     strstr(FONT_FILE_NAME, "WINDOWS\\Fonts") != nullptr);
+            } else if (strchr(FONT_FILE_NAME, '\\') != nullptr ||
+                       strchr(FONT_FILE_NAME, '/') != nullptr) {
+                isSystemFont = false;
             } else {
                 /* Just filename - check if in scanned fonts */
                 wchar_t wFontName[MAX_PATH];
@@ -473,8 +476,8 @@ void BuildFontSubmenu(HMENU hMenu) {
                                     MAX_PATH);
 
                 for (int i = 0; i < fontCount; i++) {
-                    if (wcsstr(entries[i].relativePath, wFontName) != NULL) {
-                        isSystemFont = FALSE;
+                    if (wcsstr(entries[i].relativePath, wFontName) != nullptr) {
+                        isSystemFont = false;
                         break;
                     }
                 }
@@ -488,16 +491,16 @@ void BuildFontSubmenu(HMENU hMenu) {
 
             AppendMenuW(hFontSubMenu, systemFontFlags,
                         CLOCK_IDM_SYSTEM_FONT_PICKER,
-                        GetLocalizedString(NULL, L"System Fonts..."));
+                        GetLocalizedString(nullptr, L"System Fonts..."));
         }
 
-        AppendMenuW(hFontSubMenu, MF_SEPARATOR, 0, NULL);
+        AppendMenuW(hFontSubMenu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(hFontSubMenu, MF_STRING, CLOCK_IDC_FONT_ADVANCED,
-                    GetLocalizedString(NULL, L"Open fonts folder"));
+                    GetLocalizedString(nullptr, L"Open fonts folder"));
     }
 
     AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hFontSubMenu,
-                GetLocalizedString(NULL, L"Font"));
+                GetLocalizedString(nullptr, L"Font"));
 }
 
 /**
@@ -505,20 +508,20 @@ void BuildFontSubmenu(HMENU hMenu) {
  */
 BOOL GetFontPathFromMenuId(UINT id, char* outPath, size_t outPathSize) {
     if (!outPath || outPathSize == 0)
-        return FALSE;
+        return false;
     if (id < CMD_FONT_SELECTION_BASE)
-        return FALSE;
+        return false;
 
     /* Scan fonts folder */
     FontEntry* entries =
         (FontEntry*)malloc(MAX_FONT_ENTRIES * sizeof(FontEntry));
     if (!entries)
-        return FALSE;
+        return false;
 
     int fontCount = ScanFontsFolder(entries, MAX_FONT_ENTRIES, L"");
     if (fontCount == 0) {
         free(entries);
-        return FALSE;
+        return false;
     }
 
     /* Sort to match menu order */
@@ -526,7 +529,7 @@ BOOL GetFontPathFromMenuId(UINT id, char* outPath, size_t outPathSize) {
         (FontEntry**)malloc(fontCount * sizeof(FontEntry*));
     if (!sortedEntries) {
         free(entries);
-        return FALSE;
+        return false;
     }
 
     for (int i = 0; i < fontCount; i++) {
@@ -536,14 +539,14 @@ BOOL GetFontPathFromMenuId(UINT id, char* outPath, size_t outPathSize) {
     qsort(sortedEntries, fontCount, sizeof(FontEntry*), CompareFontEntries);
 
     /* Find entry at given ID */
-    BOOL found = FALSE;
+    BOOL found = false;
     int currentId = CMD_FONT_SELECTION_BASE;
 
     for (int i = 0; i < fontCount; i++) {
         if (currentId == (int)id) {
             WideCharToMultiByte(CP_UTF8, 0, sortedEntries[i]->relativePath, -1,
-                                outPath, (int)outPathSize, NULL, NULL);
-            found = TRUE;
+                                outPath, (int)outPathSize, nullptr, nullptr);
+            found = true;
             break;
         }
         currentId++;

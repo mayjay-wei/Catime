@@ -766,7 +766,7 @@ void SetFontLicenseVersionAccepted(const char* version);
  * @brief Check if license needs re-acceptance
  * @return TRUE if version changed or no acceptance
  */
-BOOL NeedsFontLicenseVersionAcceptance(void);
+bool NeedsFontLicenseVersionAcceptance(void);
 
 /**
  * @brief Get current license version
