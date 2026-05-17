@@ -553,7 +553,7 @@ void SetupDesktopShortcut(void) {
         free(exe_path_utf8);
     }
 
-    int result = CheckAndCreateShortcut();
+    const int32_t result = CheckAndCreateShortcut();
     if (result == 0) {
         LOG_INFO("Desktop shortcut check completed");
     } else {
