@@ -8,6 +8,7 @@
 
 #include "timer/main_timer.h"
 #include "../../resource/resource.h"
+#include "utils/natural_sort.h"
 #include <mmsystem.h>
 
 #ifdef _MSC_VER
@@ -16,9 +17,9 @@
 
 /* Timer state */
 static MMRESULT g_mainTimerId = 0;
-static HWND g_mainHwnd = NULL;
+static HWND g_mainHwnd = nullptr;
 static UINT g_timerInterval = 20;
-static BOOL g_highPrecisionActive = FALSE;
+static bool g_highPrecisionActive = false;
 static UINT g_timerResolutionMs = 0;
 static volatile LONG g_tickMessagePending = 0;
 
@@ -26,43 +27,44 @@ static volatile LONG g_tickMessagePending = 0;
  * @brief Multimedia timer callback (worker thread)
  * Posts message to main thread for rendering
  */
-static void CALLBACK MainTimerCallback(UINT uTimerID, UINT uMsg,
-                                       DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2) {
-    (void)uTimerID; (void)uMsg; (void)dwUser; (void)dw1; (void)dw2;
-
-    if (g_mainHwnd && IsWindow(g_mainHwnd)) {
-        /* Coalesce pending tick messages to avoid queue backlog under UI load. */
-        if (InterlockedCompareExchange(&g_tickMessagePending, 1, 0) == 0) {
-            if (!PostMessage(g_mainHwnd, CLOCK_WM_MAIN_TIMER_TICK, 0, 0)) {
-                InterlockedExchange(&g_tickMessagePending, 0);
-            }
-        }
+static void CALLBACK MainTimerCallback([[maybe_unused]] UINT uTimerID,
+                                       [[maybe_unused]] UINT uMsg,
+                                       [[maybe_unused]] DWORD_PTR dwUser,
+                                       [[maybe_unused]] DWORD_PTR dw1,
+                                       [[maybe_unused]] DWORD_PTR dw2) {
+    if (!g_mainHwnd || !IsWindow(g_mainHwnd)) {
+        return;
     }
+    /* Coalesce pending tick messages to avoid queue backlog under UI load. */
+    if (InterlockedCompareExchange(&g_tickMessagePending, 1, 0) != 0) {
+        return;
+    }
+    if (PostMessage(g_mainHwnd, CLOCK_WM_MAIN_TIMER_TICK, 0, 0)) {
+        return;
+    }
+    InterlockedExchange(&g_tickMessagePending, 0);
 }
 
 static UINT NormalizeInterval(UINT intervalMs) {
     return intervalMs > 0 ? intervalMs : 20;
 }
 
-static BOOL StartSetTimerFallback(void) {
-    if (!g_mainHwnd) return FALSE;
+static bool StartSetTimerFallback(void) {
+    if (!g_mainHwnd)
+        return false;
     KillTimer(g_mainHwnd, TIMER_ID_MAIN);
-    return SetTimer(g_mainHwnd, TIMER_ID_MAIN, g_timerInterval, NULL) != 0;
+    return SetTimer(g_mainHwnd, TIMER_ID_MAIN, g_timerInterval, nullptr) != 0;
 }
 
-static BOOL StartMultimediaTimer(void) {
-    g_mainTimerId = timeSetEvent(
-        g_timerInterval,
-        1,
-        MainTimerCallback,
-        0,
-        TIME_PERIODIC | TIME_KILL_SYNCHRONOUS
-    );
+static bool StartMultimediaTimer(void) {
+    g_mainTimerId = timeSetEvent(g_timerInterval, 1, MainTimerCallback, 0,
+                                 TIME_PERIODIC | TIME_KILL_SYNCHRONOUS);
     return g_mainTimerId != 0;
 }
 
-BOOL MainTimer_Init(HWND hwnd, UINT intervalMs) {
-    if (!hwnd) return FALSE;
+bool MainTimer_Init(HWND hwnd, UINT intervalMs) {
+    if (!hwnd)
+        return false;
 
     /* Cleanup any existing timer */
     MainTimer_Cleanup();
@@ -71,13 +73,11 @@ BOOL MainTimer_Init(HWND hwnd, UINT intervalMs) {
     g_timerInterval = NormalizeInterval(intervalMs);
 
     /* Set system timer resolution to 1ms for precision */
-    MMRESULT res = timeBeginPeriod(1);
-    if (res != TIMERR_NOERROR) {
+    if (timeBeginPeriod(1) != TIMERR_NOERROR) {
         /* Try 2ms as fallback */
-        res = timeBeginPeriod(2);
-        if (res != TIMERR_NOERROR) {
+        if (timeBeginPeriod(2) != TIMERR_NOERROR) {
             /* Fall back to standard SetTimer */
-            g_highPrecisionActive = FALSE;
+            g_highPrecisionActive = false;
             return StartSetTimerFallback();
         }
         g_timerResolutionMs = 2;
@@ -91,16 +91,17 @@ BOOL MainTimer_Init(HWND hwnd, UINT intervalMs) {
             timeEndPeriod(g_timerResolutionMs);
             g_timerResolutionMs = 0;
         }
-        g_highPrecisionActive = FALSE;
+        g_highPrecisionActive = false;
         return StartSetTimerFallback();
     }
 
-    g_highPrecisionActive = TRUE;
-    return TRUE;
+    g_highPrecisionActive = true;
+    return true;
 }
 
-BOOL MainTimer_Start(HWND hwnd, UINT intervalMs) {
-    if (!hwnd) return FALSE;
+bool MainTimer_Start(HWND hwnd, UINT intervalMs) {
+    if (!hwnd)
+        return false;
 
     if (!g_mainHwnd || g_mainHwnd != hwnd) {
         return MainTimer_Init(hwnd, intervalMs);
@@ -112,19 +113,19 @@ BOOL MainTimer_Start(HWND hwnd, UINT intervalMs) {
         if (g_mainTimerId == 0) {
             g_timerInterval = normalized;
             if (!StartMultimediaTimer()) {
-                g_highPrecisionActive = FALSE;
+                g_highPrecisionActive = false;
                 return StartSetTimerFallback();
             }
         } else if (normalized != g_timerInterval) {
             g_timerInterval = normalized;
             timeKillEvent(g_mainTimerId);
             if (!StartMultimediaTimer()) {
-                g_highPrecisionActive = FALSE;
+                g_highPrecisionActive = false;
                 return StartSetTimerFallback();
             }
         }
         KillTimer(g_mainHwnd, TIMER_ID_MAIN);
-        return TRUE;
+        return true;
     }
 
     g_timerInterval = normalized;
@@ -165,7 +166,7 @@ void MainTimer_SetInterval(UINT intervalMs) {
 
         if (!StartMultimediaTimer()) {
             /* Fallback if recreation fails */
-            g_highPrecisionActive = FALSE;
+            g_highPrecisionActive = false;
             StartSetTimerFallback();
         }
     } else if (g_mainHwnd) {
@@ -181,10 +182,8 @@ void MainTimer_Cleanup(void) {
         g_timerResolutionMs = 0;
     }
 
-    g_highPrecisionActive = FALSE;
-    g_mainHwnd = NULL;
+    g_highPrecisionActive = false;
+    g_mainHwnd = nullptr;
 }
 
-BOOL MainTimer_IsHighPrecision(void) {
-    return g_highPrecisionActive;
-}
+bool MainTimer_IsHighPrecision(void) { return g_highPrecisionActive; }

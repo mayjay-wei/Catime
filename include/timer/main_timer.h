@@ -1,9 +1,9 @@
 /**
  * @file main_timer.h
  * @brief High-precision main window timer using multimedia timer
- * 
- * Provides smooth millisecond display by using timeSetEvent instead of SetTimer.
- * Shares timing infrastructure with tray animation system.
+ *
+ * Provides smooth millisecond display by using timeSetEvent instead of
+ * SetTimer. Shares timing infrastructure with tray animation system.
  */
 
 #ifndef MAIN_TIMER_H
@@ -17,7 +17,7 @@
  * @param intervalMs Timer interval in milliseconds
  * @return TRUE if successful
  */
-BOOL MainTimer_Init(HWND hwnd, UINT intervalMs);
+bool MainTimer_Init(HWND hwnd, UINT intervalMs);
 
 /**
  * @brief Start (or resume) main timer ticks with desired interval
@@ -25,7 +25,7 @@ BOOL MainTimer_Init(HWND hwnd, UINT intervalMs);
  * @param intervalMs Timer interval in milliseconds
  * @return TRUE if successful
  */
-BOOL MainTimer_Start(HWND hwnd, UINT intervalMs);
+bool MainTimer_Start(HWND hwnd, UINT intervalMs);
 
 /**
  * @brief Stop main timer ticks (both multimedia timer and SetTimer fallback)
@@ -52,6 +52,6 @@ void MainTimer_Cleanup(void);
  * @brief Check if high-precision timer is active
  * @return TRUE if using multimedia timer
  */
-BOOL MainTimer_IsHighPrecision(void);
+bool MainTimer_IsHighPrecision(void);
 
 #endif /* MAIN_TIMER_H */

@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.16)
 project(Catime VERSION 1.0.0 LANGUAGES C RC)
 
 # Set C standard
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 option(CATIME_ENABLE_WARNINGS "Enable stricter compiler warnings" ON)
